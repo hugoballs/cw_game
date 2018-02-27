@@ -1,0 +1,15 @@
+#ignore all unneeded CMake files
+./CMakeFiles
+./cmake-build-debug
+./cmake_install.cmake
+./CMakeCache.txt
+#ignore others
+./cw.ilk
+./cw_game.cbp
+./cw.pdb
+#NOTE: don't ignore the Makefile. It is needed for CLion
+#ignore clion files
+./.idea
+#ignore the executable
+cw.exe 			#windows
+cw 				#linux
