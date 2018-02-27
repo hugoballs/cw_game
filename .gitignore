@@ -12,3 +12,7 @@ CTestTestfile.cmake
 #executables
 cw.exe
 cw
+#other
+*.ilk
+*.pdb
+*.cbp

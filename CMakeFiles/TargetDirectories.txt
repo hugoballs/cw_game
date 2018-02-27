@@ -1,3 +1,0 @@
-C:/Users/Rory/Documents/projects/cw_game/CMakeFiles/cw.dir
-C:/Users/Rory/Documents/projects/cw_game/CMakeFiles/edit_cache.dir
-C:/Users/Rory/Documents/projects/cw_game/CMakeFiles/rebuild_cache.dir
