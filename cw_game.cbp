@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6"/>
+	<Project>
+		<Option title="cw_game"/>
+		<Option makefile_is_custom="1"/>
+		<Option compiler="msvc8"/>
+		<Option virtualFolders="CMake Files\;"/>
+		<Build>
+			<Target title="all">
+				<Option working_dir="C:/Users/Rory/Documents/projects/cw_game"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 all"/>
+					<CompileFile command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="cw">
+				<Option output="C:/Users/Rory/Documents/projects/cw_game/cw.exe" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="C:/Users/Rory/Documents/projects/cw_game"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="msvc8"/>
+				<Compiler>
+					<Add option="-DVK_USE_PLATFORM_WIN32_KHR"/>
+					<Add option="-DNOMINMAX"/>
+					<Add directory="C:/glfw-3.2.1.bin.WIN64/include"/>
+					<Add directory="C:/VulkanSDK/1.0.68.0/Include"/>
+					<Add directory="C:/Users/Rory/Documents/projects/cw_game/."/>
+					<Add directory="C:/Users/Rory/Documents/projects/cw_game/./graphics"/>
+					<Add directory="C:/Users/Rory/Documents/projects/cw_game/./logic"/>
+					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.10.25017\ATLMFC\include"/>
+					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.10.25017\include"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\ucrt"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\shared"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\um"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\winrt"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 cw"/>
+					<CompileFile command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="cw/fast">
+				<Option output="C:/Users/Rory/Documents/projects/cw_game/cw.exe" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="C:/Users/Rory/Documents/projects/cw_game"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="msvc8"/>
+				<Compiler>
+					<Add option="-DVK_USE_PLATFORM_WIN32_KHR"/>
+					<Add option="-DNOMINMAX"/>
+					<Add directory="C:/glfw-3.2.1.bin.WIN64/include"/>
+					<Add directory="C:/VulkanSDK/1.0.68.0/Include"/>
+					<Add directory="C:/Users/Rory/Documents/projects/cw_game/."/>
+					<Add directory="C:/Users/Rory/Documents/projects/cw_game/./graphics"/>
+					<Add directory="C:/Users/Rory/Documents/projects/cw_game/./logic"/>
+					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.10.25017\ATLMFC\include"/>
+					<Add directory="C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Tools\MSVC\14.10.25017\include"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\ucrt"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\shared"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\um"/>
+					<Add directory="C:\Program Files (x86)\Windows Kits\10\include\10.0.15063.0\winrt"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 cw/fast"/>
+					<CompileFile command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="C:/Users/Rory/Documents/projects/cw_game"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 edit_cache"/>
+					<CompileFile command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="rebuild_cache">
+				<Option working_dir="C:/Users/Rory/Documents/projects/cw_game"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 rebuild_cache"/>
+					<CompileFile command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+					<DistClean command="nmake /NOLOGO /f C:\Users\Rory\Documents\projects\cw_game\Makefile VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+		</Build>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/graphics/renderer.cpp">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/graphics/renderer.h">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/graphics/window.cpp">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/graphics/window.h">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/logger.cpp">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/logger.h">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/logic/logic.cpp">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/logic/logic.h">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/main.cpp">
+			<Option target="cw"/>
+		</Unit>
+		<Unit filename="C:/Users/Rory/Documents/projects/cw_game/CMakeLists.txt">
+			<Option virtualFolder="CMake Files\"/>
+		</Unit>
+	</Project>
+</CodeBlocks_project_file>

@@ -1,0 +1,76 @@
+[19:41:48][renderer]: Using instance extension: 
+[19:41:48][renderer]: VK_KHR_surface
+[19:41:48][renderer]: Using instance extension: 
+[19:41:48][renderer]: VK_KHR_win32_surface
+[19:41:48][renderer]: Using instance layer: 
+[19:41:48][renderer]: VK_LAYER_LUNARG_standard_validation
+[19:41:48][renderer]: Physical Device: using 
+[19:41:48][renderer]: GeForce GTX 1060 6GB
+[19:41:48][renderer]: 
+
+[19:41:48][renderer]: Physical Device: using universal queue family: 
+[19:41:48][renderer]: 0
+[19:41:48][renderer]: using gq fam: 
+[19:41:48][renderer]: 0
+[19:41:48][renderer]: using gq count: 
+[19:41:48][renderer]: 1
+[19:41:48][renderer]: using pq fam: 
+[19:41:48][renderer]: 0
+[19:41:48][renderer]: using pq count: 
+[19:41:48][renderer]: 1
+[19:41:48][renderer]: Using device extension: 
+[19:41:48][renderer]: VK_KHR_swapchain
+[19:41:48][renderer]: created command pool.
+
+[19:41:48][renderer]: creating pipeline...
+[19:41:48][renderer]: Pipeline bot: create render pass 
+[19:41:48][renderer]: 000000000000000A
+[19:41:48][renderer]: created pipeline layout 
+[19:41:48][renderer]: 000000000000000B
+[19:41:48][renderer]: create graphics pipeline: 
+[19:41:48][renderer]: 000000000000000E
+[19:41:48][renderer]: framebuffer size(): 
+[19:41:48][renderer]: 3
+[19:41:48][renderer]: created command buffer: 
+[19:41:48][renderer]: 00000283BE5DB808
+[19:41:48][renderer]: created command buffer: 
+[19:41:48][renderer]: 00000283BE5DFF08
+[19:41:48][renderer]: created command buffer: 
+[19:41:48][renderer]: 00000283BE60B388
+[19:42:03][renderer]: failed to present: 
+[19:42:03][renderer]: VULKAN_HPP_NAMESPACE::Queue::presentKHR: ErrorOutOfDateKHR
+[19:42:03][renderer]: clearing pipeline...
+[19:42:03][renderer]: creating pipeline...
+[19:42:03][renderer]: Pipeline bot: create render pass 
+[19:42:03][renderer]: 000000000000001B
+[19:42:03][renderer]: created pipeline layout 
+[19:42:03][renderer]: 000000000000001C
+[19:42:03][renderer]: create graphics pipeline: 
+[19:42:03][renderer]: 000000000000001F
+[19:42:03][renderer]: framebuffer size(): 
+[19:42:03][renderer]: 3
+[19:42:03][renderer]: created command buffer: 
+[19:42:03][renderer]: 00000283BE60B388
+[19:42:03][renderer]: created command buffer: 
+[19:42:03][renderer]: 00000283BE62E788
+[19:42:03][renderer]: created command buffer: 
+[19:42:03][renderer]: 00000283BE5DB808
+[19:42:11][renderer]: failed to present: 
+[19:42:11][renderer]: VULKAN_HPP_NAMESPACE::Queue::presentKHR: ErrorOutOfDateKHR
+[19:42:11][renderer]: clearing pipeline...
+[19:42:11][renderer]: creating pipeline...
+[19:42:11][renderer]: Pipeline bot: create render pass 
+[19:42:11][renderer]: 000000000000002C
+[19:42:11][renderer]: created pipeline layout 
+[19:42:11][renderer]: 000000000000002D
+[19:42:11][renderer]: create graphics pipeline: 
+[19:42:11][renderer]: 0000000000000030
+[19:42:11][renderer]: framebuffer size(): 
+[19:42:11][renderer]: 3
+[19:42:11][renderer]: created command buffer: 
+[19:42:11][renderer]: 00000283BE5DB808
+[19:42:11][renderer]: created command buffer: 
+[19:42:11][renderer]: 00000283BE5DFF08
+[19:42:11][renderer]: created command buffer: 
+[19:42:11][renderer]: 00000283BE60B388
+[19:42:23][renderer]: clearing pipeline...
