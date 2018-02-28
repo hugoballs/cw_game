@@ -9,6 +9,8 @@ compile_commands.json
 CTestTestfile.cmake
 #clion
 .idea
+#vs code
+.vscode
 #executables
 cw.exe
 cw
@@ -16,3 +18,5 @@ cw
 *.ilk
 *.pdb
 *.cbp
+#app log files
+log

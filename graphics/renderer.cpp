@@ -136,7 +136,7 @@ void renderer::create_device()
 	for (auto& device : physical_devices) { //TODO: Make a proper evalutation system
 		if (device.getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu || device.getProperties().deviceType ==  vk::PhysicalDeviceType::eIntegratedGpu) {
 			m_physical_device = device;
-			log << "Physical Device: using " << device.getProperties().deviceName << "\n" ;
+			log << "Physical Device: using " << device.getProperties().deviceName;
 			break;
 		}
 	}
@@ -255,178 +255,6 @@ void renderer::verify_device_extensions(std::vector<name_and_version>& wanted, s
 	}
 }
 
-//Render pass
-
-vk::RenderPass renderer::create_render_pass(vk::Format format)
-{
-	//attachments
-	vk::AttachmentDescription attach_desc = {
-		{},
-		format,
-		vk::SampleCountFlagBits::e1,
-		vk::AttachmentLoadOp::eClear,
-		vk::AttachmentStoreOp::eStore,
-		vk::AttachmentLoadOp::eDontCare,
-		vk::AttachmentStoreOp::eDontCare,
-		vk::ImageLayout::eUndefined,
-		vk::ImageLayout::ePresentSrcKHR
-	};
-	
-	vk::AttachmentReference attach_ref = { 0, vk::ImageLayout::eColorAttachmentOptimal };		// 0 defines the output location in the fragment shader
-
-	//subpass
-	vk::SubpassDescription subpass_desc = {
-		{},
-		vk::PipelineBindPoint::eGraphics,
-		{},																						//input attachment count
-		{},																						//input attachment reference
-		1,																						//color attachment count
-		&attach_ref,																			//color attachment references
-		{},																						//resolve attachment
-		{},																						//depth stencil attachment
-		{},																						//preserve attachment count
-		{}																						//preserve attachments
-	};
-
-	//subpass dependency for drawing synchronisation
-	vk::SubpassDependency dependency = {
-		{},																					//src subpass, leave as ~0U OR VK_SUBPASS_EXTERNAL in vulkan-1.h
-		0,
-		vk::PipelineStageFlagBits::eColorAttachmentOutput,										//src subpass
-		vk::PipelineStageFlagBits::eColorAttachmentOutput,										//dst subpass
-		{},																						//access src
-		vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,	//access dst
-		{}
-	};
-
-	//create
-	vk::RenderPassCreateInfo create_info = {
-		{},
-		1,
-		&attach_desc,
-		1,
-		&subpass_desc,
-		1,
-		&dependency
-	};
-
-	vk::RenderPass holder;
-	try {
-		holder = m_device.createRenderPass(create_info, nullptr);
-	}
-	catch (const std::exception& e) {
-		log << "Pipeline bot error: failed to create render pass: " << e.what() ;
-	}
-
-	log << "Pipeline bot: create render pass " << holder ;
-	return holder;
-}
-
-
-void renderer::destroy_render_pass(vk::RenderPass handle)
-{
-		m_device.destroyRenderPass(handle, nullptr);
-}
-
-
-//Graphics pipeline
-
-vk::Pipeline renderer::create_pipeline(vk::RenderPass& render_pass, vk::PipelineLayout& layout)
-{
-	//shader stages
-	vk::ShaderModule vertex_module = create_shader(R"(C:\Users\Rory\Documents\projects\cw_game\resources/vert.spv)");
-	vk::ShaderModule frag_module = create_shader(R"(C:\Users\Rory\Documents\projects\cw_game\resources/frag.spv)");
-    //for temporary cleanup
-    m_primary_shaders.push_back(vertex_module);
-    m_primary_shaders.push_back(frag_module);
-	
-	vk::PipelineShaderStageCreateInfo vertex_stage_info = { {}, vk::ShaderStageFlagBits::eVertex, vertex_module, "main", {} };
-	vk::PipelineShaderStageCreateInfo frag_stage_info = { {}, vk::ShaderStageFlagBits::eFragment, frag_module, "main", {} };
-
-	vk::PipelineShaderStageCreateInfo shaders[] = { vertex_stage_info, frag_stage_info };
-
-	//input TODO: add binding desc + attribute desc
-	vk::PipelineVertexInputStateCreateInfo vertex_input_state = { {}, 0, {}, 0, {} };
-
-	//input assembly TODO: set flast one to true for index buffers
-	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = { {}, vk::PrimitiveTopology::eTriangleList, false };
-
-	//viewport
-	vk::Extent2D extent = m_window.get_image_extent();
-	vk::Viewport viewport = { 0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f };
-	vk::Rect2D scissor = { {0, 0}, extent };
-	vk::PipelineViewportStateCreateInfo viewport_state = { {}, 1, &viewport, 1, &scissor };
-
-	//rasteriser
-	vk::PipelineRasterizationStateCreateInfo rasterisation_state = {
-		{},
-		false,																			//clamp enable
-		false,																			//rasteriser discard
-		vk::PolygonMode::eFill,
-		vk::CullModeFlagBits::eBack,
-		vk::FrontFace::eClockwise,
-		false,																			//depth bias
-		0.0f,
-		0.0f,
-		0.0f,
-		1.0f																			//line width
-	};
-
-	//multisampling
-	vk::PipelineMultisampleStateCreateInfo multisample_state = { {}, vk::SampleCountFlagBits::e1 }; //TODO: actually look into this
-
-	//TODO: depth + stencil testing
-
-	//color blending TODO: implement blending
-	vk::PipelineColorBlendAttachmentState colour_blend_attachment = { false, {}, {}, {}, {}, {}, {},
-																	vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA };
-
-	vk::PipelineColorBlendStateCreateInfo colour_blend_state = { {}, false, {}, 1, &colour_blend_attachment, {} };			//Blending is set to false for now
-
-	//dynamic state
-	vk::DynamicState dynamic_states_array[] = { vk::DynamicState::eViewport, vk::DynamicState::eLineWidth };			
-	vk::PipelineDynamicStateCreateInfo dynamic_state = { {}, 2, dynamic_states_array };
-
-	//create
-	vk::Pipeline pipeline;
-	vk::GraphicsPipelineCreateInfo create_info = {
-		{},
-		2,
-		shaders,
-		&vertex_input_state,
-		&input_assembly_state,
-		{},																	//tesselation
-		&viewport_state,
-		&rasterisation_state,
-		&multisample_state,
-		{},																	// depth stencil
-		&colour_blend_state,
-		{},																	//TODO: implement dynamic state
-		layout,
-		render_pass
-	};
-
-
-	try {
-		pipeline = m_device.createGraphicsPipeline(vk::PipelineCache(), create_info, nullptr);
-	}
-	catch (std::exception& e) {
-		log << "failed to create graphics pipeline: " << e.what() ;
-		throw;
-	}
-	log << "create graphics pipeline: " << pipeline ;
-	return pipeline;
-}
-
-void renderer::destroy_pipeline(vk::Pipeline handle)
-{
-    //no need for WaitIdle() because that is already handled in the parent functions
-    m_device.destroyPipeline(handle, nullptr);
-    for(auto shader: m_primary_shaders) {
-        m_device.destroyShaderModule(shader);
-    }
-}
-
 //pipeline layout
 
 vk::PipelineLayout renderer::create_pipeline_layout()
@@ -447,37 +275,7 @@ vk::PipelineLayout renderer::create_pipeline_layout()
 
 void renderer::destroy_pipeline_layout(vk::PipelineLayout handle)
 {
-		m_device.destroyPipelineLayout(handle, nullptr);
-}
-
-//helper
-
-vk::ShaderModule renderer::create_shader(std::string path)
-{
-	std::ifstream file(path, std::ifstream::ate | std::ifstream::binary);
-	if (!file.is_open()) {
-		log << "failed to open shader file at " << path ;
-		throw std::runtime_error("failed to open shader file");
-	}
-	else {
-		size_t size = (size_t)file.tellg();
-		std::vector<char> buffer(size);
-		file.seekg(0);
-		file.read(buffer.data(), size);
-		//file.close();
-
-		vk::ShaderModuleCreateInfo create_info = { {}, buffer.size(), reinterpret_cast<const uint32_t*>(buffer.data()) };
-		vk::ShaderModule shader;
-		try {
-			shader = m_device.createShaderModule(create_info, nullptr);
-		}
-		catch (const std::exception& e) {
-			log << "failed to create shader module for: " << path ;
-			log << e.what() ;
-			throw std::runtime_error("failed to create shader module.");
-		}
-		return shader;
-	}
+	m_device.destroyPipelineLayout(handle);
 }
 
 //SEPERATOR: command buffers
@@ -531,7 +329,7 @@ void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuff
 
 	vk::Rect2D area = { {0, 0}, m_window.get_image_extent() };
 	vk::ClearValue clear = vk::ClearColorValue(std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f });
-	vk::RenderPassBeginInfo rp_info = { m_primary_render_pass, framebuffer, area, 1, &clear };
+	vk::RenderPassBeginInfo rp_info = { m_primary_render_pass.get(), framebuffer, area, 1, &clear };
 	try {
 		cmd_buffer.beginRenderPass(rp_info, vk::SubpassContents::eInline);								//TODO: modify for secondary command buffers
 	}
@@ -561,7 +359,7 @@ void renderer::create_drawing_enviroment()
 	m_command_buffers.resize(count);
 	for (int i = 0; i < count; i++) {																	//create command buffers
 		m_command_buffers[i] = create_command_buffer(vk::CommandBufferLevel::ePrimary);
-		record_command_buffer(m_command_buffers[i], m_window.m_framebuffers[i], m_primary_pipeline, 3);			//TODO: make vertex count dynamic
+		record_command_buffer(m_command_buffers[i], m_window.m_framebuffers[i], m_primary_pipeline.get(), 3);			//TODO: make vertex count dynamic
 		log << "created command buffer: " << m_command_buffers[i] ;
 	}
 
@@ -656,10 +454,10 @@ void renderer::recreate_swapchain()
 void renderer::create_pipeline()
 {
     log << "creating pipeline...";
-    m_primary_render_pass = create_render_pass(m_window.get_image_format());
+    m_primary_render_pass.reset(m_device, m_window.get_image_format());
     m_primary_layout = create_pipeline_layout();
-    m_primary_pipeline = create_pipeline(m_primary_render_pass, m_primary_layout);
-    m_window.create_framebuffers(m_primary_render_pass);
+    m_primary_pipeline.reset(m_device, m_primary_render_pass.get(), m_primary_layout, m_window.get_image_extent());
+    m_window.create_framebuffers(m_primary_render_pass.get());
 }
 
 void renderer::clear_pipeline()
@@ -667,9 +465,9 @@ void renderer::clear_pipeline()
     m_device.waitIdle();
     log << "clearing pipeline...";
     m_window.destroy_framebuffers();
-    destroy_render_pass(m_primary_render_pass);
+    m_primary_render_pass.reset();
     destroy_pipeline_layout(m_primary_layout);
-    destroy_pipeline(m_primary_pipeline);
+	m_primary_pipeline.reset();
 }
 
 void renderer::recreate_pipeline()

@@ -7,6 +7,8 @@
 #include <memory>
 
 #include "renderer.inl"
+#include "render_pass.h"
+#include "pipeline.h"
 
 namespace cwg {
 
@@ -33,10 +35,9 @@ private:
 	vk::Queue m_presentation_queue;											//same but for presentation
 	queue_info m_presentation_queue_info;									//same. it could have the same queue family as the graphics queue depending on the hardware
 
-    std::vector<vk::ShaderModule> m_primary_shaders;
-	vk::RenderPass m_primary_render_pass;
+	graphics::render_pass m_primary_render_pass;
 	vk::PipelineLayout m_primary_layout;
-	vk::Pipeline m_primary_pipeline;
+	graphics::pipeline m_primary_pipeline;
 
     /*  Will not use since going to go for oject-oriented abstraction
 	std::vector<vk::RenderPass> m_render_passes;							//vector containing all render pass handles with names
@@ -60,16 +61,12 @@ private:
 	void destroy_device();
 	void verify_device_extensions(std::vector<name_and_version>& wanted, std::vector<const char*>& out);
 
-	size_t find_render_pass(vk::RenderPass handle);							//functions for finding handle in vectors
 	size_t find_pipeline(vk::Pipeline handle);
 	size_t find_pipeline_layout(vk::PipelineLayout handle);
 
 	vk::ShaderModule create_shader(std::string path);
 	vk::RenderPass create_render_pass(vk::Format format);					//basic, no options yet
 	void destroy_render_pass(vk::RenderPass handle);
-
-	vk::Pipeline create_pipeline(vk::RenderPass& render_pass, vk::PipelineLayout& layout);
-	void destroy_pipeline(vk::Pipeline handle);
 
 	vk::PipelineLayout create_pipeline_layout();
 	void destroy_pipeline_layout(vk::PipelineLayout handle);
