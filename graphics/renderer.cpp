@@ -4,6 +4,7 @@
 #include "renderer.h"
 
 namespace cwg {
+namespace graphics {
 
 renderer::renderer() : log("renderer", "log/renderer.log", {})
 {
@@ -16,15 +17,36 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	create_device();
 	create_swapchain();
     create_command_pool();
-	create_pipeline();
+	create_transfer_pool();
+	//caution: vulkan uses inverted y axis
+	std::vector<float> data = {
+		0.0, -0.5, 1.0, 1.0, 0.0,
+		0.5, 0.5, 0.0, 1.0, 0.0,
+		-0.5, 0.5, 0.0, 0.0, 1.0
+	};
+	auto t_size = data.size() * sizeof(float);
+	auto v_size = 5 * sizeof(float);
 
-	create_drawing_enviroment();
+	m_staging_buffer.reset(m_device, m_physical_device, data, t_size, v_size);
+	m_primary_vb.reset(m_device, m_physical_device, t_size, v_size);
+	m_staging_buffer.copy(m_primary_vb, m_transfer_pool, m_graphics_queue);
+	m_staging_buffer.reset();
+
+	m_primary_vb.set_attribute(0, 0, 2);
+	m_primary_vb.set_attribute(0, 1, 3);
+
+	create_pipeline();
+	create_drawing_enviroment(m_primary_vb);
 }
 
 renderer::~renderer()
 {
+	log << "last recorded fps: " << m_fps_counter.get_last();
+	m_device.waitIdle();
+	m_primary_vb.reset();
     destroy_drawing_enviroment();
 	clear_pipeline();
+	destroy_transfer_pool();
     destroy_command_pool();
 	clear_swapchain();
 	destroy_device();
@@ -47,7 +69,8 @@ void renderer::create_instance()
 
 		std::vector<name_and_version> instance_layers;
 #ifndef NDEBUG
-		instance_layers.push_back({ "VK_LAYER_LUNARG_standard_validation", ANY_NAV_VERSION });
+		instance_layers.push_back( { "VK_LAYER_LUNARG_standard_validation", ANY_NAV_VERSION } );
+		instance_layers.push_back( {"VK_LAYER_LUNARG_assistant_layer", ANY_NAV_VERSION });
 #endif
 
     std::vector<const char*> checked_extensions;
@@ -255,28 +278,6 @@ void renderer::verify_device_extensions(std::vector<name_and_version>& wanted, s
 	}
 }
 
-//pipeline layout
-
-vk::PipelineLayout renderer::create_pipeline_layout()
-{
-	//create
-	vk::PipelineLayout layout;
-	vk::PipelineLayoutCreateInfo layout_info = { {}, {}, {}, {}, {} };										//TODO: fill
-	try {
-		layout = m_device.createPipelineLayout(layout_info, nullptr);
-	}
-	catch (const std::exception& e) {
-		log << "failed to create pipeline layout: " << e.what() ;
-		throw std::runtime_error("failed to create pipeline layout");
-	}
-	log << "created pipeline layout " << layout ;
-	return layout;
-}
-
-void renderer::destroy_pipeline_layout(vk::PipelineLayout handle)
-{
-	m_device.destroyPipelineLayout(handle);
-}
 
 //SEPERATOR: command buffers
 
@@ -298,6 +299,24 @@ void renderer::destroy_command_pool()
 	m_device.destroyCommandPool(m_command_pool);
 }
 
+void renderer::create_transfer_pool()
+{
+	vk::CommandPoolCreateInfo create_info = { vk::CommandPoolCreateFlagBits::eTransient , m_graphics_queue_info.queue_family };
+	try {
+		m_transfer_pool = m_device.createCommandPool(create_info);
+	}
+	catch (const std::exception& e) {
+		log << "failed to create command pool: " << e.what() ;
+		throw std::runtime_error("failed to create command pool.");
+	}
+	log << "created command pool.\n";
+}
+
+void renderer::destroy_transfer_pool()
+{
+	m_device.destroyCommandPool(m_transfer_pool);
+}
+
 vk::CommandBuffer renderer::create_command_buffer(vk::CommandBufferLevel level)
 {
 	vk::CommandBuffer out;
@@ -317,7 +336,7 @@ void renderer::destroy_command_buffer(vk::CommandBuffer buffer)
 	m_device.freeCommandBuffers(m_command_pool, buffer);
 }
 
-void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuffer framebuffer, vk::Pipeline pipeline, uint32_t vertex_count)
+void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuffer framebuffer, vk::Pipeline pipeline, graphics::vertex_buffer& vb)
 {
 	vk::CommandBufferBeginInfo buf_info = { vk::CommandBufferUsageFlagBits::eSimultaneousUse, {} };
 	try {
@@ -340,7 +359,9 @@ void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuff
 	
 	//draw
 	cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
-	cmd_buffer.draw(vertex_count, 1, 0, 0);
+	cmd_buffer.bindVertexBuffers(0, { vb.get() }, { 0 });
+	log << "vb size(): " << vb.size();
+	cmd_buffer.draw(vb.size(), 1, 0, 0);
 
 	cmd_buffer.endRenderPass();
 
@@ -352,14 +373,14 @@ void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuff
 	}
 }
 
-void renderer::create_drawing_enviroment()
+void renderer::create_drawing_enviroment(graphics::vertex_buffer& vb)
 {
 	size_t count = m_window.m_framebuffers.size();
 	log << "framebuffer size(): " << count ;
 	m_command_buffers.resize(count);
 	for (int i = 0; i < count; i++) {																	//create command buffers
 		m_command_buffers[i] = create_command_buffer(vk::CommandBufferLevel::ePrimary);
-		record_command_buffer(m_command_buffers[i], m_window.m_framebuffers[i], m_primary_pipeline.get(), 3);			//TODO: make vertex count dynamic
+		record_command_buffer(m_command_buffers[i], m_window.m_framebuffers[i], m_primary_pipeline.get(), vb);			//TODO: make vertex count dynamic
 		log << "created command buffer: " << m_command_buffers[i] ;
 	}
 
@@ -389,6 +410,8 @@ void renderer::draw()
 {
 	//do logic here
 	m_graphics_queue.waitIdle();
+	m_fps_counter.tick(std::chrono::steady_clock::now());
+	
     vk::Result res;
     aquire:
         uint32_t img_index;
@@ -399,7 +422,7 @@ void renderer::draw()
             destroy_drawing_enviroment();
             recreate_swapchain();
             recreate_pipeline();    //create a new render pass with the new extent and possible new format
-            create_drawing_enviroment();
+            create_drawing_enviroment(m_primary_vb);
             goto aquire;
         }
 
@@ -424,9 +447,6 @@ void renderer::draw()
         catch (const std::exception& e) {
             log << "failed to present: " << e.what() ;
         }
-
-
-
 }
 
 void renderer::create_swapchain()
@@ -455,8 +475,8 @@ void renderer::create_pipeline()
 {
     log << "creating pipeline...";
     m_primary_render_pass.reset(m_device, m_window.get_image_format());
-    m_primary_layout = create_pipeline_layout();
-    m_primary_pipeline.reset(m_device, m_primary_render_pass.get(), m_primary_layout, m_window.get_image_extent());
+    m_primary_layout.reset(m_device);
+    m_primary_pipeline.reset(m_device, m_primary_render_pass.get(), m_primary_layout.get(), m_window.get_image_extent(), &m_primary_vb);
     m_window.create_framebuffers(m_primary_render_pass.get());
 }
 
@@ -466,7 +486,7 @@ void renderer::clear_pipeline()
     log << "clearing pipeline...";
     m_window.destroy_framebuffers();
     m_primary_render_pass.reset();
-    destroy_pipeline_layout(m_primary_layout);
+    m_primary_layout.reset();
 	m_primary_pipeline.reset();
 }
 
@@ -476,5 +496,5 @@ void renderer::recreate_pipeline()
     create_pipeline();
 }
 
-
+}
 }

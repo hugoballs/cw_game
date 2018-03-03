@@ -5,9 +5,9 @@
 namespace cwg {
 namespace graphics {
 
-pipeline::pipeline(vk::Device dev, vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D extent) : m_device(dev)
+pipeline::pipeline(vk::Device dev, vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D extent, graphics::vertex_buffer *vb) : m_device(dev)
 {
-    create(rp, lay, extent);
+    create(rp, lay, extent, vb);
 }
 
 pipeline::~pipeline()
@@ -15,7 +15,7 @@ pipeline::~pipeline()
     destroy();
 }
 
-void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D extent)
+void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D extent, graphics::vertex_buffer *vb)
 {
     if(m_device == vk::Device()) { throw std::runtime_error("cannot create rendere pass if there is no device."); }
     //shader stages
@@ -31,7 +31,12 @@ void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D ex
 	vk::PipelineShaderStageCreateInfo shaders[] = { vertex_stage_info, frag_stage_info };
 
 	//input TODO: add binding desc + attribute desc
-	vk::PipelineVertexInputStateCreateInfo vertex_input_state = { {}, 0, {}, 0, {} };
+	std::vector<vk::VertexInputBindingDescription> bindings;
+	vb->get_binding_descriptions(&bindings);
+	std::vector<vk::VertexInputAttributeDescription> attribs;
+	vb->get_attribute_descriptions(&attribs);
+
+	vk::PipelineVertexInputStateCreateInfo vertex_input_state = { {}, static_cast<uint32_t>(bindings.size()), bindings.data(), static_cast<uint32_t>(attribs.size()), attribs.data() };
 
 	//input assembly TODO: set flast one to true for index buffers
 	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = { {}, vk::PrimitiveTopology::eTriangleList, false };

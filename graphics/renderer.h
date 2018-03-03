@@ -5,13 +5,21 @@
 #include "../logger.h"
 #include "window.h"
 #include <memory>
+#include <chrono>
+
 
 #include "renderer.inl"
 #include "render_pass.h"
 #include "pipeline.h"
+#include "pipeline_layout.h"
+
+#include "buffers/vertex_buffer.h"
+#include "buffers/staging_buffer.h"
+
+#include "misc/fps_counter.h"
 
 namespace cwg {
-
+namespace graphics {
 
 enum class renderer_states {
 	no_init,
@@ -35,17 +43,15 @@ private:
 	vk::Queue m_presentation_queue;											//same but for presentation
 	queue_info m_presentation_queue_info;									//same. it could have the same queue family as the graphics queue depending on the hardware
 
-	graphics::render_pass m_primary_render_pass;
-	vk::PipelineLayout m_primary_layout;
-	graphics::pipeline m_primary_pipeline;
-
-    /*  Will not use since going to go for oject-oriented abstraction
-	std::vector<vk::RenderPass> m_render_passes;							//vector containing all render pass handles with names
-	std::vector<vk::Pipeline> m_pipelines;									//same but for pipelines
-	std::vector<vk::PipelineLayout> m_pipeline_layouts;						//TODO: rethink
-    */
+	render_pass m_primary_render_pass;
+	pipeline_layout m_primary_layout;
+	pipeline m_primary_pipeline;
+	
+	staging_buffer m_staging_buffer;
+	vertex_buffer m_primary_vb;									//vertex buffer being used to draw
 
 	vk::CommandPool m_command_pool;
+	vk::CommandPool m_transfer_pool;
 	std::vector<vk::CommandBuffer> m_command_buffers;						//use 1 command buffer per frame (example: 3 for triple-buffering)
 
 	vk::Semaphore m_render_should_begin;										//semaphores used for synchronisation in the draw() function
@@ -61,23 +67,15 @@ private:
 	void destroy_device();
 	void verify_device_extensions(std::vector<name_and_version>& wanted, std::vector<const char*>& out);
 
-	size_t find_pipeline(vk::Pipeline handle);
-	size_t find_pipeline_layout(vk::PipelineLayout handle);
-
-	vk::ShaderModule create_shader(std::string path);
-	vk::RenderPass create_render_pass(vk::Format format);					//basic, no options yet
-	void destroy_render_pass(vk::RenderPass handle);
-
-	vk::PipelineLayout create_pipeline_layout();
-	void destroy_pipeline_layout(vk::PipelineLayout handle);
-
 	void create_command_pool();
 	void destroy_command_pool();
+	void create_transfer_pool();
+	void destroy_transfer_pool();
 	vk::CommandBuffer create_command_buffer(vk::CommandBufferLevel level);
 	void destroy_command_buffer(vk::CommandBuffer buffer);
-	void record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuffer framebuffer, vk::Pipeline pipeline, uint32_t vertex_count);
+	void record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuffer framebuffer, vk::Pipeline pipeline, graphics::vertex_buffer& vb);
 
-	void create_drawing_enviroment();
+	void create_drawing_enviroment(graphics::vertex_buffer& vb);
 	void destroy_drawing_enviroment();
 
 	void create_swapchain();
@@ -87,6 +85,8 @@ private:
     void create_pipeline();
     void clear_pipeline();
     void recreate_pipeline();                                                    //dont know what to name yet. recreates the pipeline
+
+	fps_counter m_fps_counter;
 public:
 	renderer();
 	~renderer();
@@ -99,6 +99,7 @@ public:
 
 
 
+}
 }
 
 #endif

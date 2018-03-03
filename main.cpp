@@ -11,7 +11,7 @@
 int main() {
 	cwg::logger l("main", "log/main.log", {});
 
-	cwg::renderer render;
+	cwg::graphics::renderer render;
 	//cwg::logic::init();
 	while (!render.should_close()) {
 		render.draw();
