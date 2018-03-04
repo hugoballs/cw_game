@@ -14,7 +14,7 @@ if(WIN32)
     include_directories("C:\\glfw-3.2.1.bin.WIN64\\include" "C:\\VulkanSDK\\1.0.68.0\\Include")
     link_directories("C:\\glfw-3.2.1.bin.WIN64\\lib-vc2015" "C:\\VulkanSDK\\1.0.68.0\\Lib")           #using mingw
 elseif(UNIX)
-    set(LINK_LIBS libvulkan.so libglfw3.a -ldl -pthread -lm
+    set(LINK_LIBS libvulkan.so libglfw.so -ldl -pthread -lm
     -ldl
     -lX11
     -lXxf86vm
@@ -22,10 +22,9 @@ elseif(UNIX)
     -lXinerama
     -lXinerama
     -lXcursor)
-    set(PP_DEF "VK_USE_PLATFORM_XLIB_KHR")
     #libs
-    link_directories(/usr/lib)
-    include_directories(~/VulkanSDK/1.0.68.0/x86_64/Include/)
+    link_directories(/usr/lib ~/VulkanSDK/1.0.68.0/x86_64/lib)
+    include_directories(/usr/include ~/VulkanSDK/1.0.68.0/x86_64/include)
 endif(WIN32)
 
 #headers
@@ -39,5 +38,3 @@ add_executable(cw ${SOURCES})
 
 #libraries, todo: make compatible with windows
 target_link_libraries(cw ${LINK_LIBS})
-
-target_compile_definitions(cw PRIVATE ${PP_DEF})

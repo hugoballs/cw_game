@@ -64,13 +64,14 @@ void renderer::create_instance()
 #ifdef _WIN32
 	instance_extensions.push_back({ "VK_KHR_win32_surface", ANY_NAV_VERSION });
 #elif defined __linux
-	instance_extensions.push_back({ "VK_KHR_xlib_surface", ANY_NAV_VERSION });
+	//TODO: detect XLIB vs XCB
+	instance_extensions.push_back({ "VK_KHR_xcb_surface", ANY_NAV_VERSION });
 #endif
 
 		std::vector<name_and_version> instance_layers;
 #ifndef NDEBUG
 		instance_layers.push_back( { "VK_LAYER_LUNARG_standard_validation", ANY_NAV_VERSION } );
-		instance_layers.push_back( {"VK_LAYER_LUNARG_assistant_layer", ANY_NAV_VERSION });
+		//instance_layers.push_back( {"VK_LAYER_LUNARG_assistant_layer", ANY_NAV_VERSION } );
 #endif
 
     std::vector<const char*> checked_extensions;

@@ -44,9 +44,16 @@ void window::create_window(uint32_t width, uint32_t height, const char * name)
 
 void window::create_surface(vk::Instance instance)
 {
+	log << "Required GLFW extensions: ";
+	uint32_t count;
+	const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+	for(uint32_t i = 0; i < count; i++) {
+		log << extensions[i];
+	}
 	VkSurfaceKHR temp;
-	if (glfwCreateWindowSurface(instance, m_window.get(), nullptr, &temp) != VK_SUCCESS) {
-		log << "Error: failed to create window surface. Result: " ;
+	VkResult res = glfwCreateWindowSurface(instance, m_window.get(), nullptr, &temp);
+	if (res != VK_SUCCESS) {
+		log << "Error: failed to create window surface. Result: " << res;
 		throw std::runtime_error("Failed to create window surface.");
 	}
 	else {

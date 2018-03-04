@@ -19,8 +19,8 @@ void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D ex
 {
     if(m_device == vk::Device()) { throw std::runtime_error("cannot create rendere pass if there is no device."); }
     //shader stages
-	vk::ShaderModule vertex_module = create_shader(R"(C:\Users\Rory\Documents\projects\cw_game\resources/vert.spv)");
-	vk::ShaderModule frag_module = create_shader(R"(C:\Users\Rory\Documents\projects\cw_game\resources/frag.spv)");
+	vk::ShaderModule vertex_module = create_shader(R"(./resources/vert.spv)");
+	vk::ShaderModule frag_module = create_shader(R"(./resources/frag.spv)");
     //for temporary cleanup
     m_shaders.push_back(vertex_module);
     m_shaders.push_back(frag_module);
