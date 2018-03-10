@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.0)
 project(cw_game)
 
 #C++ standard
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -28,10 +28,10 @@ elseif(UNIX)
 endif(WIN32)
 
 #headers
-include_directories(./ ./graphics/ ./graphics/buffers ./graphics/misc ./logic)
+include_directories(./ ./graphics/ ./graphics/buffers ./graphics/misc ./graphics/objects ./logic ./maths)
 
 #source
-file(GLOB_RECURSE SOURCES ./main.cpp ./logger.cpp ./graphics/*.cpp ./logic/*.cpp)
+file(GLOB_RECURSE SOURCES ./main.cpp ./logger.cpp ./graphics/*.cpp ./logic/*.cpp ./maths/*.cpp)
 
 #program
 add_executable(cw ${SOURCES})

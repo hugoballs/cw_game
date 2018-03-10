@@ -2,11 +2,12 @@
 #include <fstream>
 
 #include "renderer.h"
+#include "buffers/uniform_buffer.h"
 
 namespace cwg {
 namespace graphics {
 
-renderer::renderer() : log("renderer", "log/renderer.log", {})
+renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(1.0f), m_view_mat(1.0f), m_projection_mat(1.0f)
 {
 	/* Right now there is no initialisation. will definetly need vulkan support detection*/
 	m_internal_state = renderer_states::init;
@@ -20,9 +21,10 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	create_transfer_pool();
 	//caution: vulkan uses inverted y axis
 	std::vector<float> data = {
-		0.0, -0.5, 1.0, 1.0, 0.0,
-		0.5, 0.5, 0.0, 1.0, 0.0,
-		-0.5, 0.5, 0.0, 0.0, 1.0
+		-0.5, -0.5, 1.0, 0.0, 0.0,
+		0.5, -0.5, 0.0, 1.0, 0.0,
+		0.5, 0.5, 0.0, 0.0, 1.0,
+		-0.5, 0.5, 1.0, 1.0, 1.0
 	};
 	auto t_size = data.size() * sizeof(float);
 	auto v_size = 5 * sizeof(float);
@@ -35,6 +37,38 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	m_primary_vb.set_attribute(0, 0, 2);
 	m_primary_vb.set_attribute(0, 1, 3);
 
+	std::vector<uint32_t> indices = {
+		0, 1, 2,
+		2, 3, 0
+	};
+
+	m_staging_buffer.reset(m_device, m_physical_device, indices, indices.size() * sizeof(uint32_t));
+	m_primary_ib.reset(m_device, m_physical_device, indices.size() * sizeof(uint32_t));
+	m_staging_buffer.copy(m_primary_ib, m_transfer_pool, m_graphics_queue);
+	m_staging_buffer.reset();
+	
+	vk::DeviceSize ub_size = sizeof(float) * 16 * 3;
+	create_descriptor_pool(vk::DescriptorType::eUniformBuffer, 1);
+	m_uniform_buffer.reset(m_device, m_physical_device, ub_size);
+	struct ubo {
+		float *model;
+		float *view;
+		float *proj;
+	};
+	ubo obu;
+	obu.model = m_transform_mat.column_major_data().data();
+	obu.view = m_view_mat.column_major_data().data();
+	obu.proj = m_projection_mat.column_major_data().data();
+	log << "sizeof(obu): " << ub_size;
+	m_uniform_buffer.write(&obu, ub_size);
+	for(size_t i = 0; i < m_transform_mat.size(); i++) {
+		log << m_transform_mat[i];
+	}
+	descriptor desc = { 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, m_uniform_buffer.get(), ub_size };
+	std::vector<descriptor> desc_vec = { desc };
+	m_descriptor_set.reset(m_device, m_descriptor_pool, desc_vec);
+	m_descriptor_set.update();
+
 	create_pipeline();
 	create_drawing_enviroment(m_primary_vb);
 }
@@ -43,6 +77,10 @@ renderer::~renderer()
 {
 	log << "last recorded fps: " << m_fps_counter.get_last();
 	m_device.waitIdle();
+	m_uniform_buffer.reset();
+	m_descriptor_set.reset();
+	destroy_descriptor_pool();
+	m_primary_ib.reset();
 	m_primary_vb.reset();
     destroy_drawing_enviroment();
 	clear_pipeline();
@@ -318,6 +356,27 @@ void renderer::destroy_transfer_pool()
 	m_device.destroyCommandPool(m_transfer_pool);
 }
 
+void renderer::create_descriptor_pool(vk::DescriptorType type, uint32_t descriptor_count, uint32_t max_sets)
+{
+	vk::DescriptorPoolSize size = { type, descriptor_count };
+	vk::DescriptorPoolCreateInfo pool_info = { {} ,max_sets, 1, &size };
+	try {
+		m_descriptor_pool = m_device.createDescriptorPool(pool_info);
+	}
+	catch (const std::exception& e) {
+		log << "failed to create command pool: " << e.what() ;
+		throw std::runtime_error("failed to create command pool.");
+	}
+	log << "created descriptor pool.\n";
+}
+
+void renderer::destroy_descriptor_pool()
+{
+	m_device.destroyDescriptorPool(m_descriptor_pool);
+}
+
+//Command buffers
+
 vk::CommandBuffer renderer::create_command_buffer(vk::CommandBufferLevel level)
 {
 	vk::CommandBuffer out;
@@ -361,8 +420,12 @@ void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuff
 	//draw
 	cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	cmd_buffer.bindVertexBuffers(0, { vb.get() }, { 0 });
-	log << "vb size(): " << vb.size();
-	cmd_buffer.draw(vb.size(), 1, 0, 0);
+	cmd_buffer.bindIndexBuffer(m_primary_ib.get(), 0, m_primary_ib.get_index_type());
+	//cmd_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_primary_layout.get(), 0, { m_descriptor_set.get() }, {});
+	
+	
+	cmd_buffer.drawIndexed(m_primary_ib.size(), 1, 0, 0, 0);
+	//cmd_buffer.draw(vb.size(), 1, 0, 0);
 
 	cmd_buffer.endRenderPass();
 
@@ -476,7 +539,9 @@ void renderer::create_pipeline()
 {
     log << "creating pipeline...";
     m_primary_render_pass.reset(m_device, m_window.get_image_format());
-    m_primary_layout.reset(m_device);
+	m_descriptor_layouts.clear();
+	//m_descriptor_layouts.push_back(m_descriptor_set.get_layout());
+    m_primary_layout.reset(m_device, m_descriptor_layouts);
     m_primary_pipeline.reset(m_device, m_primary_render_pass.get(), m_primary_layout.get(), m_window.get_image_extent(), &m_primary_vb);
     m_window.create_framebuffers(m_primary_render_pass.get());
 }

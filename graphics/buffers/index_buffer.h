@@ -28,9 +28,15 @@ public:
 
     inline void reset() { deallocate(); destroy(); m_total_size = 0; }
     inline void reset(vk::Device dev, vk::PhysicalDevice p_dev, vk::DeviceSize total_size) {
-         deallocate(); destroy(); m_device = dev; m_total_size = total_size; create(m_total_size); allocate(p_dev); }
+         deallocate();
+         destroy();
+         m_device = dev;
+         m_total_size = total_size;
+         create(m_total_size);
+         allocate(p_dev);
+    }
 
-    inline uint32_t size() { return static_cast<uint32_t>(m_total_size / sizeof(uint32_t)); }
+    inline uint32_t size() { return m_total_size / sizeof(uint32_t); }         //vulkan actually expects a vertex count in uint32_t
     inline void set_total_size(vk::DeviceSize s) { m_total_size = s; }
     inline vk::IndexType get_index_type() { return vk::IndexType::eUint32; }
 };

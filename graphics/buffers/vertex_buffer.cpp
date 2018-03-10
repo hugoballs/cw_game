@@ -7,8 +7,7 @@ namespace cwg {
 namespace graphics {
 
 vertex_buffer::vertex_buffer(vk::Device dev, vk::PhysicalDevice p_dev, vk::DeviceSize total_size, vk::DeviceSize vertex_size) :
-    buffer_base(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal),
-    log("vertex_buffer", "log/vb.log", {})
+    buffer_base(vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal)
 {
     m_device = dev;
     m_total_size = total_size;

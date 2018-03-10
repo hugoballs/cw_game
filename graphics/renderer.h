@@ -12,11 +12,16 @@
 #include "render_pass.h"
 #include "pipeline.h"
 #include "pipeline_layout.h"
+#include "descriptor_set.h"
 
 #include "buffers/vertex_buffer.h"
+#include "buffers/index_buffer.h"
 #include "buffers/staging_buffer.h"
+#include "buffers/uniform_buffer.h"
 
 #include "misc/fps_counter.h"
+
+#include "../maths/mat.h"
 
 namespace cwg {
 namespace graphics {
@@ -49,10 +54,19 @@ private:
 	
 	staging_buffer m_staging_buffer;
 	vertex_buffer m_primary_vb;									//vertex buffer being used to draw
+	index_buffer m_primary_ib;
 
 	vk::CommandPool m_command_pool;
 	vk::CommandPool m_transfer_pool;
 	std::vector<vk::CommandBuffer> m_command_buffers;						//use 1 command buffer per frame (example: 3 for triple-buffering)
+
+	vk::DescriptorPool m_descriptor_pool;
+	uniform_buffer<float> m_uniform_buffer;
+	descriptor_set m_descriptor_set;
+	std::vector<vk::DescriptorSetLayout> m_descriptor_layouts;
+	cwg::maths::mat4<float> m_transform_mat;
+	cwg::maths::mat4<float> m_view_mat;
+	cwg::maths::mat4<float> m_projection_mat;
 
 	vk::Semaphore m_render_should_begin;										//semaphores used for synchronisation in the draw() function
 	vk::Semaphore m_render_has_finished;
@@ -74,6 +88,9 @@ private:
 	vk::CommandBuffer create_command_buffer(vk::CommandBufferLevel level);
 	void destroy_command_buffer(vk::CommandBuffer buffer);
 	void record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuffer framebuffer, vk::Pipeline pipeline, graphics::vertex_buffer& vb);
+
+	void create_descriptor_pool(vk::DescriptorType type, uint32_t descriptor_count, uint32_t max_sets = 1);
+	void destroy_descriptor_pool();
 
 	void create_drawing_enviroment(graphics::vertex_buffer& vb);
 	void destroy_drawing_enviroment();

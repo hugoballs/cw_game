@@ -6,6 +6,7 @@
 namespace cwg {
 namespace graphics {
 
+//TODO: make this a template
 class buffer_base {                                                 //buffer base class
 protected:
     vk::BufferUsageFlags m_type_flags;
@@ -24,6 +25,7 @@ public:
     buffer_base(vk::BufferUsageFlags type, vk::MemoryPropertyFlags alloc) : m_type_flags(type), m_allocation_flags(alloc) {}
     ~buffer_base() {}
     inline vk::Buffer get() const { return m_handle; }
+    inline vk::BufferUsageFlags type() const { return m_type_flags; }
 };
 
 }
