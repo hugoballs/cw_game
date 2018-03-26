@@ -88,10 +88,13 @@ void window::create_swapchain()
 		log << "failed to retrieve surface formats: " << e.what() ;
 	}
 
-	if (formats.size() == 1 && formats[0].format == vk::Format::eUndefined) {	//if undefined set it to default
+	//if (formats.size() == 1 && formats[0].format == vk::Format::eUndefined) {	//if undefined set it to default
 		formats[0].format = vk::Format::eB8G8R8A8Unorm;
 		formats[0].colorSpace = vk::ColorSpaceKHR::eExtendedSrgbNonlinearEXT;
-	}
+		//atm forcing format to produce results that don't look terrible
+		//TODO: make format selection algorithm
+	//}
+	log << "got surface formats." ;
 
 	//present modes
 	std::vector<vk::PresentModeKHR> present_modes;
@@ -103,6 +106,7 @@ void window::create_swapchain()
 	catch (const std::exception& e) {
 		log << "Window: failed to retrieve present modes: " << e.what() ;
 	}
+	log << "got present modes.";
 
 	//TODO: add support/warnings for other modes
 	for (int i = 0; i < present_modes.size(); i++) {
@@ -130,6 +134,7 @@ void window::create_swapchain()
 	catch (const std::exception& e) {
 		log << "Window: failed to retrieve present modes: " << e.what() ;
 	}
+	log << "retrieved surface capabilites." ;
 
 	//extent
 	//some window managers do this
@@ -142,8 +147,9 @@ void window::create_swapchain()
 	}
 
 	//image count + format
-	image_count = surface_capabilites.maxImageCount;
-	if (surface_capabilites.minImageCount < 3 && surface_capabilites.maxImageCount >= 3) {	//triple buffering
+	image_count = 2;
+	//if max is 0, it means unlimited
+	if (surface_capabilites.minImageCount < 3 && surface_capabilites.maxImageCount >= 3 || surface_capabilites.maxImageCount == 0) {	//triple buffering
 		image_count = 3;
 	}
 
@@ -168,11 +174,11 @@ void window::create_swapchain()
 		true,
 		vk::SwapchainKHR() };
 	try {
-		m_swapchain = m_device.createSwapchainKHR(create_info, nullptr);
+		m_swapchain = m_device.createSwapchainKHR(create_info);
 	}
 	catch (const std::exception &e) {
 		log << "failed to create swapchain: " << e.what() ;
-		std::runtime_error("see log");
+		throw std::runtime_error("see log");
 	}
 
 	log << "swapchain created." ;
@@ -180,7 +186,13 @@ void window::create_swapchain()
 	m_image_format = formats[selected_format_index].format;
 	m_image_extent = extent;
 	//retrieve image handles
-	m_swapchain_images = m_device.getSwapchainImagesKHR(m_swapchain);
+	try {
+		m_swapchain_images = m_device.getSwapchainImagesKHR(m_swapchain);
+	}
+	catch(const std::exception& e) {
+		log << "failed to retrieve swapchain images";
+		throw std::runtime_error("see log.");
+	}
 }
 
 void window::destroy_swapchain()

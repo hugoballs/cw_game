@@ -21,10 +21,10 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 	create_transfer_pool();
 	//caution: vulkan uses inverted y axis
 	std::vector<float> data = {
-		-0.5, -0.5, 1.0, 0.0, 0.0,
-		0.5, -0.5, 0.0, 1.0, 0.0,
-		0.5, 0.5, 0.0, 0.0, 1.0,
-		-0.5, 0.5, 1.0, 1.0, 1.0
+		-0.5, 0.5, 1.0, 0.0, 0.0,
+		0.5, 0.5, 0.0, 1.0, 0.0,
+		0.5, -0.5, 0.0, 0.0, 1.0,
+		-0.5, -0.5, 1.0, 1.0, 1.0
 	};
 	auto t_size = data.size() * sizeof(float);
 	auto v_size = 5 * sizeof(float);
@@ -104,6 +104,7 @@ void renderer::create_instance()
 #elif defined __linux
 	//TODO: detect XLIB vs XCB
 	instance_extensions.push_back({ "VK_KHR_xcb_surface", ANY_NAV_VERSION });
+	instance_extensions.push_back({ "VK_KHR_xlib_surface", ANY_NAV_VERSION });
 #endif
 
 		std::vector<name_and_version> instance_layers;
@@ -210,20 +211,13 @@ void renderer::create_device()
 	uint32_t gq_fam = std::numeric_limits<uint32_t>::max();
 	uint32_t pq_fam = std::numeric_limits<uint32_t>::max();
 
+	//TODO: eventually make better selection algorithm for queues
 	for (unsigned int i = 0; i < device_queues.size(); i++) {
-		if (device_queues[i].queueFlags & vk::QueueFlagBits::eGraphics && device_queues[i].queueCount > gq_count + pq_count && m_physical_device.getSurfaceSupportKHR(i, m_window.get_surface())) {
+		if (device_queues[i].queueFlags & vk::QueueFlagBits::eGraphics && device_queues[i].queueCount >= 1 && m_physical_device.getSurfaceSupportKHR(i, m_window.get_surface())) {
 			log << "Physical Device: using universal queue family: " << i ;
 			gq_fam = i;
 			pq_fam = i;
 			break;
-		}
-		else if (device_queues[i].queueFlags & vk::QueueFlagBits::eGraphics && device_queues[i].queueCount > gq_count) {
-			gq_fam = i;
-			log << "Physical Device: using queue family for graphics: " << i ;
-		}
-		else if (m_physical_device.getSurfaceSupportKHR(i, m_window.get_surface()) && device_queues[i].queueCount > pq_count) {
-			pq_fam = i;
-			log << "Physical Device: using queue family for presentation: " << i ;
 		}
 	}
 
@@ -231,30 +225,12 @@ void renderer::create_device()
 		throw std::runtime_error("Failed to find suitable queue(s).");
 	}
 
-	std::vector<vk::DeviceQueueCreateInfo> queue_infos;
-	float q_priorities[] = { 1.0, 1.0 };
-
-	if (gq_fam == pq_fam) {
-		vk::DeviceQueueCreateInfo gq_info = { vk::DeviceQueueCreateFlags(), gq_fam, gq_count + pq_count, q_priorities };
-		queue_infos.push_back(gq_info);
-
-		//m_graphics_queue_info = queue_info(gq_fam, gq_count);
-		m_graphics_queue_info.queue_family = gq_fam;
-		m_graphics_queue_info.queue_indices = { 0 };
-		log << "using gq fam: " << gq_fam << "using gq count: " << gq_count ;
-		m_presentation_queue_info.queue_family = pq_fam;
-		m_presentation_queue_info.queue_indices = { 1 };
-		log << "using pq fam: " << pq_fam << "using pq count: " << pq_count ;
-	}
-	else {
-		vk::DeviceQueueCreateInfo gq_info = { vk::DeviceQueueCreateFlags(), gq_fam, gq_count, q_priorities };
-		queue_infos.push_back(gq_info);
-		m_graphics_queue_info = queue_info(gq_fam, gq_count);
-
-		vk::DeviceQueueCreateInfo pq_info = { vk::DeviceQueueCreateFlags(), pq_fam, pq_count, q_priorities };
-		queue_infos.push_back(pq_info);
-		m_graphics_queue_info = queue_info(pq_fam, pq_count);
-	}
+	const float priorites[] = { 1.0 };
+	vk::DeviceQueueCreateInfo queue_info = { {}, gq_fam, gq_count, priorites };
+	vk::DeviceQueueCreateInfo queues[] = { queue_info };
+	m_graphics_queue_info.queue_family = gq_fam;
+	m_graphics_queue_info.queue_indices = { 0 };
+	m_presentation_queue_info = m_graphics_queue_info;
 
 	//extensions
 	std::vector<name_and_version> requiredExtensions = {
@@ -262,21 +238,23 @@ void renderer::create_device()
 	};
 	std::vector<const char*> checked_extensions;
     verify_device_extensions(requiredExtensions, checked_extensions);
-
 	//create device
-	vk::DeviceCreateInfo dev_info = { {}, static_cast<uint32_t>(queue_infos.size()), queue_infos.data(), 0, nullptr, static_cast<uint32_t>(checked_extensions.size()), checked_extensions.data(), nullptr };
+	vk::DeviceCreateInfo dev_info = { {}, 1, queues, 0, nullptr, static_cast<uint32_t>(checked_extensions.size()), checked_extensions.data(), nullptr };
+	
 	try {
 		m_physical_device.createDevice(&dev_info, nullptr, &m_device);
+		log << "created device";
 	}
 	catch (const std::exception &e) {
 		log << "could not create extension: " << e.what()  ;
 		throw std::runtime_error("could not create logical vulkan device");
 	}
 
+
 	//retrieve queue handles
 	try {
-		 m_graphics_queue = m_device.getQueue(gq_fam, m_graphics_queue_info.queue_indices[0]); 
-		 m_presentation_queue = m_device.getQueue(gq_fam, m_presentation_queue_info.queue_indices[0]);
+		 m_graphics_queue = m_device.getQueue(gq_fam, m_graphics_queue_info.queue_indices[0]);
+		 m_presentation_queue = m_graphics_queue;		//atm only using 1 queue
 	}
 	catch (const std::exception &e) {
 		log << "could not retrieve vulkan queue handle(s): " << e.what()  ;

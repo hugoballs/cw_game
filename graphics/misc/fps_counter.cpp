@@ -8,7 +8,7 @@ namespace graphics {
 void fps_counter::tick(std::chrono::steady_clock::time_point tp)
 {
     static uint32_t m_frame_count = 0;
-    static std::queue<uint32_t> avg_frames = {};
+    static std::queue<uint32_t> avg_frames;
 	static std::chrono::steady_clock::time_point last_tp;
 	static bool init = false;
 	if(!init) { last_tp = tp; init = true; }
