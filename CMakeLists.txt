@@ -28,10 +28,10 @@ elseif(UNIX)
 endif(WIN32)
 
 #headers
-include_directories(./ ./graphics/ ./graphics/buffers ./graphics/misc ./graphics/objects ./logic ./maths)
+include_directories(./src ./src./graphics/ ./src/graphics/buffers ./src/graphics/misc ./src/graphics/objects ./src//logic ./src/maths)
 
 #source
-file(GLOB_RECURSE SOURCES ./main.cpp ./logger.cpp ./graphics/*.cpp ./logic/*.cpp ./maths/*.cpp)
+file(GLOB_RECURSE SOURCES ./src/*.cpp)
 
 #program
 add_executable(cw ${SOURCES})

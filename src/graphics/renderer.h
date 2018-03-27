@@ -61,9 +61,10 @@ private:
 	std::vector<vk::CommandBuffer> m_command_buffers;						//use 1 command buffer per frame (example: 3 for triple-buffering)
 
 	vk::DescriptorPool m_descriptor_pool;
-	uniform_buffer<float> m_uniform_buffer;
-	descriptor_set m_descriptor_set;
-	std::vector<vk::DescriptorSetLayout> m_descriptor_layouts;
+	uniform_buffer m_uniform_buffer;
+	vk::DeviceSize m_uniform_buffer_size = 3 * 16 * sizeof(float);
+	vk::DescriptorSet m_descriptor_set;
+	vk::DescriptorSetLayout m_descriptor_layout;
 	cwg::maths::mat4<float> m_transform_mat;
 	cwg::maths::mat4<float> m_view_mat;
 	cwg::maths::mat4<float> m_projection_mat;
@@ -91,6 +92,11 @@ private:
 
 	void create_descriptor_pool(vk::DescriptorType type, uint32_t descriptor_count, uint32_t max_sets = 1);
 	void destroy_descriptor_pool();
+	void create_descriptor_set_layout();
+	void destroy_descriptor_set_layout();
+	void create_descriptor_set();
+	void destroy_descriptor_set();
+	void update_uniform_buffer();
 
 	void create_drawing_enviroment(graphics::vertex_buffer& vb);
 	void destroy_drawing_enviroment();

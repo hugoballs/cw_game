@@ -88,13 +88,16 @@ void window::create_swapchain()
 		log << "failed to retrieve surface formats: " << e.what() ;
 	}
 
-	//if (formats.size() == 1 && formats[0].format == vk::Format::eUndefined) {	//if undefined set it to default
+	if (formats.size() == 1 && formats[0].format == vk::Format::eUndefined) {	//if undefined set it to default
 		formats[0].format = vk::Format::eB8G8R8A8Unorm;
 		formats[0].colorSpace = vk::ColorSpaceKHR::eExtendedSrgbNonlinearEXT;
 		//atm forcing format to produce results that don't look terrible
 		//TODO: make format selection algorithm
-	//}
-	log << "got surface formats." ;
+	}
+	else {
+		selected_format_index = formats.size() - 1;	//select last
+	}
+	log << "got number of surface formast: " << formats.size();
 
 	//present modes
 	std::vector<vk::PresentModeKHR> present_modes;

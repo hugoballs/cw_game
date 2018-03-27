@@ -1,5 +1,6 @@
 #include <cstring>
 #include <fstream>
+#include <array>
 
 #include "renderer.h"
 #include "buffers/uniform_buffer.h"
@@ -20,6 +21,7 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
     create_command_pool();
 	create_transfer_pool();
 	//caution: vulkan uses inverted y axis
+	//NOTE: IMPORTANT: make sure the vertices are in the correct order
 	std::vector<float> data = {
 		-0.5, 0.5, 1.0, 0.0, 0.0,
 		0.5, 0.5, 0.0, 1.0, 0.0,
@@ -46,28 +48,13 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 	m_primary_ib.reset(m_device, m_physical_device, indices.size() * sizeof(uint32_t));
 	m_staging_buffer.copy(m_primary_ib, m_transfer_pool, m_graphics_queue);
 	m_staging_buffer.reset();
+
+	m_uniform_buffer.reset(m_device, m_physical_device, m_uniform_buffer_size);
 	
-	vk::DeviceSize ub_size = sizeof(float) * 16 * 3;
-	create_descriptor_pool(vk::DescriptorType::eUniformBuffer, 1);
-	m_uniform_buffer.reset(m_device, m_physical_device, ub_size);
-	struct ubo {
-		float *model;
-		float *view;
-		float *proj;
-	};
-	ubo obu;
-	obu.model = m_transform_mat.column_major_data().data();
-	obu.view = m_view_mat.column_major_data().data();
-	obu.proj = m_projection_mat.column_major_data().data();
-	log << "sizeof(obu): " << ub_size;
-	m_uniform_buffer.write(&obu, ub_size);
-	for(size_t i = 0; i < m_transform_mat.size(); i++) {
-		log << m_transform_mat[i];
-	}
-	descriptor desc = { 0, vk::DescriptorType::eUniformBuffer, vk::ShaderStageFlagBits::eVertex, m_uniform_buffer.get(), ub_size };
-	std::vector<descriptor> desc_vec = { desc };
-	m_descriptor_set.reset(m_device, m_descriptor_pool, desc_vec);
-	m_descriptor_set.update();
+	create_descriptor_pool(vk::DescriptorType::eUniformBuffer, 1, 1);
+	create_descriptor_set_layout();
+	create_descriptor_set();
+	update_uniform_buffer();
 
 	create_pipeline();
 	create_drawing_enviroment(m_primary_vb);
@@ -78,7 +65,8 @@ renderer::~renderer()
 	log << "last recorded fps: " << m_fps_counter.get_last();
 	m_device.waitIdle();
 	m_uniform_buffer.reset();
-	m_descriptor_set.reset();
+	destroy_descriptor_set();
+	destroy_descriptor_set_layout();
 	destroy_descriptor_pool();
 	m_primary_ib.reset();
 	m_primary_vb.reset();
@@ -353,6 +341,71 @@ void renderer::destroy_descriptor_pool()
 	m_device.destroyDescriptorPool(m_descriptor_pool);
 }
 
+//Descriptor Sets
+
+void renderer::create_descriptor_set_layout()
+{
+	vk::DescriptorSetLayoutBinding binding = { 0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, {} };
+    vk::DescriptorSetLayoutCreateInfo ci = { {}, 1, &binding };
+    vk::DescriptorSetLayout layout;
+    try {
+		m_descriptor_layout = m_device.createDescriptorSetLayout(ci);
+    }
+    catch(const std::exception& e) {
+		throw std::runtime_error("failed to create descriptor set layout.");
+    }
+}
+
+void renderer::destroy_descriptor_set_layout()
+{
+	m_device.destroyDescriptorSetLayout(m_descriptor_layout);
+}
+
+void renderer::create_descriptor_set()
+{
+	vk::DescriptorSetAllocateInfo alloc = { m_descriptor_pool, 1, &m_descriptor_layout };
+	try {
+		std::vector<vk::DescriptorSet> sets = m_device.allocateDescriptorSets(alloc);
+		if(sets.size() > 1 ) {
+			throw std::runtime_error("invalid number of descriptor sets.");
+		}
+		m_descriptor_set = sets.front();
+	}
+	catch(const std::exception& e) {
+		throw;
+	}
+
+	//configure
+	vk::DescriptorBufferInfo buf_info = { m_uniform_buffer.get(), 0, m_uniform_buffer_size };
+	vk::WriteDescriptorSet write_info = { m_descriptor_set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, {}, &buf_info, {} };
+	try {
+		m_device.updateDescriptorSets( { write_info }, {});
+	}
+	catch(const std::exception& e) {
+		throw std::runtime_error("failed to update descriptor set.");
+	}
+}
+
+void renderer::destroy_descriptor_set()
+{
+	//no need, will be destroyed along with pool
+}
+
+void renderer::update_uniform_buffer()
+{
+	struct ubo {
+		std::array<float, 16> model;
+		std::array<float, 16> view;
+		std::array<float, 16> proj;
+	};
+	maths::vec4<float> vec { 0.25, 0.0, 0.0, 1.0 };
+	m_transform_mat.translate(vec);
+
+	ubo this_obj_ubo = { m_transform_mat.column_major_data(), m_view_mat.column_major_data(), m_projection_mat.column_major_data() };
+	std::cout << "writing data" << std::endl;
+	m_uniform_buffer.write(&this_obj_ubo, m_uniform_buffer_size);
+}
+
 //Command buffers
 
 vk::CommandBuffer renderer::create_command_buffer(vk::CommandBufferLevel level)
@@ -399,7 +452,7 @@ void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuff
 	cmd_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, pipeline);
 	cmd_buffer.bindVertexBuffers(0, { vb.get() }, { 0 });
 	cmd_buffer.bindIndexBuffer(m_primary_ib.get(), 0, m_primary_ib.get_index_type());
-	//cmd_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_primary_layout.get(), 0, { m_descriptor_set.get() }, {});
+	cmd_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_primary_layout.get(), 0, { m_descriptor_set }, {});
 	
 	
 	cmd_buffer.drawIndexed(m_primary_ib.size(), 1, 0, 0, 0);
@@ -517,9 +570,9 @@ void renderer::create_pipeline()
 {
     log << "creating pipeline...";
     m_primary_render_pass.reset(m_device, m_window.get_image_format());
-	m_descriptor_layouts.clear();
+	//m_descriptor_layouts.clear();
 	//m_descriptor_layouts.push_back(m_descriptor_set.get_layout());
-    m_primary_layout.reset(m_device, m_descriptor_layouts);
+    m_primary_layout.reset(m_device, &m_descriptor_layout);
     m_primary_pipeline.reset(m_device, m_primary_render_pass.get(), m_primary_layout.get(), m_window.get_image_extent(), &m_primary_vb);
     m_window.create_framebuffers(m_primary_render_pass.get());
 }

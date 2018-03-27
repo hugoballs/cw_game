@@ -6,7 +6,6 @@
 namespace cwg {
 namespace graphics {
 
-template <typename T>
 class uniform_buffer : public buffer_base {
     vk::DeviceSize m_total_size;
 

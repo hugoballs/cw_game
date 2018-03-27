@@ -39,7 +39,7 @@ void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D ex
 	vk::PipelineVertexInputStateCreateInfo vertex_input_state = { {}, static_cast<uint32_t>(bindings.size()), bindings.data(), static_cast<uint32_t>(attribs.size()), attribs.data() };
 
 	//input assembly TODO: set flast one to true for index buffers
-	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = { {}, vk::PrimitiveTopology::eTriangleList, true };
+	vk::PipelineInputAssemblyStateCreateInfo input_assembly_state = { {}, vk::PrimitiveTopology::eTriangleList, false };
 
 	//viewport
 	vk::Viewport viewport = { 0.0f, 0.0f, static_cast<float>(extent.width), static_cast<float>(extent.height), 0.0f, 1.0f };
