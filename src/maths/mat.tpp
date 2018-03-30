@@ -164,10 +164,10 @@ constexpr vec<T, NROW> multiply(const vec<T, NROW>& vector) const
     return temp;
 }
 
-//linear transformations
-//TODO: overhaul this with funnctions/mapping
+//linear transformations: uniquely available for 4x4 matrices atm.
 
-void translate(vec<T, NROW>& vector)        //must have the same amount of rows as the vector
+std::enable_if<NROW == 4 && NCOL == 4>       //std::enable_if has default of void for arg 2
+translate(vec<T, NROW>& vector)        //must have the same amount of rows as the vector
 {
     //TODO: should maybe have an optional checking layer for parameter checking, example: did you mean to set w coordinate to 0?
     size_t vec_i = 0;
@@ -177,7 +177,8 @@ void translate(vec<T, NROW>& vector)        //must have the same amount of rows 
     }
 }
 
-void scale(vec<T, NROW>& vector)
+std::enable_if<NROW == 4 && NCOL == 4>
+scale(vec<T, NROW>& vector)
 {
     size_t offset = 0;
     for(size_t i = 0; i < NROW * NCOL; i += NCOL + 1) {
@@ -186,9 +187,9 @@ void scale(vec<T, NROW>& vector)
     }
 }
 
-void rotate(axis ax, double angle)      //angle in radians
+std::enable_if<NROW == 4 && NCOL == 4>
+rotate(axis ax, double angle)      //angle in radians
 {
-    assert(NCOL > 2 && NROW > 3);
     switch(ax) {
         case axis::x: {
             this->at(NCOL + 1) = cos(angle);
@@ -212,7 +213,8 @@ void rotate(axis ax, double angle)      //angle in radians
     }
 }
 
-void perspective_proj(double fov, double aspect_ratio, double near_plane, double far_plane)
+std::enable_if<NROW == 4 && NCOL == 4>
+perspective_proj(double fov, double aspect_ratio, double near_plane, double far_plane)
 {
     //this->at
 }
