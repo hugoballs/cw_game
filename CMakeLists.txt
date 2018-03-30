@@ -23,8 +23,8 @@ elseif(UNIX)
     -lXinerama
     -lXcursor)
     #libs
-    link_directories(/usr/lib /usr/local/lib ~/VulkanSDK/1.0.68.0/x86_64/lib)
-    include_directories(/usr/include /usr/local/include ~/VulkanSDK/1.0.68.0/x86_64/include)
+    link_directories(/usr/local/lib ~/VulkanSDK/1.1.70.1/x86_64/lib)
+    include_directories(/usr/local/include ~/VulkanSDK/1.1.70.1/x86_64/include)
 endif(WIN32)
 
 #headers

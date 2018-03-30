@@ -9,17 +9,20 @@ layout(binding = 0) uniform UniformBufferObject {
 
 layout(location = 0) in vec2 inPos;
 layout(location = 1) in vec3 inCol;
+layout(location = 2) in vec2 inTexCoord;
 
 layout(location = 0) out vec3 fragCol;
+layout(location = 1) out vec2 fragTexCoord;
 
 out gl_PerVertex {
     vec4 gl_Position;
 };
 
 void main() {
-	//NOTE: IMPORTANT! not inverting the -y axis gives a back screen: investigate.
+	//NOTE: inverting the -y axis is a possible solution to Vulkan's new coordinate system. In fact it is preferable because matrices do not need to be changed.
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPos.x, -inPos.y, 0.0, 1.0);
    	//gl_Position = vec4(inPos.x, inPos.y, 0.0, 1.0);
    	vec4 temp = ubo.proj * ubo.view * ubo.model * vec4(inCol, 1.0);
     fragCol = vec3(temp.x, temp.y, temp.z);
+    fragTexCoord = inTexCoord;
 }

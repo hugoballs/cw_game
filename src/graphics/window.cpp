@@ -76,7 +76,7 @@ vk::SurfaceKHR window::get_surface()
 void window::create_swapchain()
 {
 	assert(m_device != vk::Device() || m_physical_device != vk::PhysicalDevice() || m_presentation_queue != vk::Queue() || p_presentation_queue_info != nullptr);
-
+	
 	//image format
 	std::vector<vk::SurfaceFormatKHR> formats;
 	uint32_t selected_format_index = 0;
@@ -95,7 +95,17 @@ void window::create_swapchain()
 		//TODO: make format selection algorithm
 	}
 	else {
-		selected_format_index = formats.size() - 1;	//select last
+		bool found = false;
+		for(uint32_t i = 0; i < formats.size(); i++) {
+			if(formats[i].format == vk::Format::eB8G8R8A8Unorm) {
+				selected_format_index = i;
+				found = true;
+				break;
+			}
+		}
+		if(!found) {
+			selected_format_index = formats.size() - 1;	//select last //temp
+		}
 	}
 	log << "got number of surface formast: " << formats.size();
 

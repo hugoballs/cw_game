@@ -51,7 +51,7 @@ void render_pass::create(vk::Format format)
 		0,
 		vk::PipelineStageFlagBits::eColorAttachmentOutput,										//src subpass
 		vk::PipelineStageFlagBits::eColorAttachmentOutput,										//dst subpass
-		{},																						//access src
+		{},																					//access src
 		vk::AccessFlagBits::eColorAttachmentRead | vk::AccessFlagBits::eColorAttachmentWrite,	//access dst
 		{}
 	};

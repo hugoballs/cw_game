@@ -5,6 +5,9 @@
 #include "renderer.h"
 #include "buffers/uniform_buffer.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "../dependencies/stb_image.h"
+
 namespace cwg {
 namespace graphics {
 
@@ -23,13 +26,13 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 	//caution: vulkan uses inverted y axis
 	//NOTE: IMPORTANT: make sure the vertices are in the correct order
 	std::vector<float> data = {
-		-0.5, 0.5, 1.0, 0.0, 0.0,
-		0.5, 0.5, 0.0, 1.0, 0.0,
-		0.5, -0.5, 0.0, 0.0, 1.0,
-		-0.5, -0.5, 1.0, 1.0, 1.0
+		-0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
+		0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+		0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
+		-0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0
 	};
 	auto t_size = data.size() * sizeof(float);
-	auto v_size = 5 * sizeof(float);
+	auto v_size = (2 + 3 + 2) * sizeof(float);
 
 	m_staging_buffer.reset(m_device, m_physical_device, data, t_size, v_size);
 	m_primary_vb.reset(m_device, m_physical_device, t_size, v_size);
@@ -38,6 +41,7 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 
 	m_primary_vb.set_attribute(0, 0, 2);
 	m_primary_vb.set_attribute(0, 1, 3);
+	m_primary_vb.set_attribute(0, 2, 2);
 
 	std::vector<uint32_t> indices = {
 		0, 1, 2,
@@ -51,7 +55,9 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 
 	m_uniform_buffer.reset(m_device, m_physical_device, m_uniform_buffer_size);
 	
-	create_descriptor_pool(vk::DescriptorType::eUniformBuffer, 1, 1);
+	create_texture("resources/earth.jpg");
+
+	create_descriptor_pool(1);
 	create_descriptor_set_layout();
 	create_descriptor_set();
 	update_uniform_buffer();
@@ -64,6 +70,8 @@ renderer::~renderer()
 {
 	log << "last recorded fps: " << m_fps_counter.get_last();
 	m_device.waitIdle();
+	m_staging_buffer.reset();
+	destroy_texture();
 	m_uniform_buffer.reset();
 	destroy_descriptor_set();
 	destroy_descriptor_set_layout();
@@ -188,6 +196,7 @@ void renderer::create_device()
 		if (device.getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu || device.getProperties().deviceType ==  vk::PhysicalDeviceType::eIntegratedGpu) {
 			m_physical_device = device;
 			log << "Physical Device: using " << device.getProperties().deviceName;
+			m_sampler_anistropy = device.getFeatures().samplerAnisotropy;
 			break;
 		}
 	}
@@ -226,8 +235,12 @@ void renderer::create_device()
 	};
 	std::vector<const char*> checked_extensions;
     verify_device_extensions(requiredExtensions, checked_extensions);
+
+	//device features
+	vk::PhysicalDeviceFeatures features = {};
+	features.samplerAnisotropy = true;
 	//create device
-	vk::DeviceCreateInfo dev_info = { {}, 1, queues, 0, nullptr, static_cast<uint32_t>(checked_extensions.size()), checked_extensions.data(), nullptr };
+	vk::DeviceCreateInfo dev_info = { {}, 1, queues, 0, nullptr, static_cast<uint32_t>(checked_extensions.size()), checked_extensions.data(), &features };
 	
 	try {
 		m_physical_device.createDevice(&dev_info, nullptr, &m_device);
@@ -322,10 +335,12 @@ void renderer::destroy_transfer_pool()
 	m_device.destroyCommandPool(m_transfer_pool);
 }
 
-void renderer::create_descriptor_pool(vk::DescriptorType type, uint32_t descriptor_count, uint32_t max_sets)
+void renderer::create_descriptor_pool(uint32_t max_sets)
 {
-	vk::DescriptorPoolSize size = { type, descriptor_count };
-	vk::DescriptorPoolCreateInfo pool_info = { {} ,max_sets, 1, &size };
+	std::array<vk::DescriptorPoolSize, 2> sizes;
+	sizes[0] = { vk::DescriptorType::eUniformBuffer, 1 };
+	sizes[1] = { vk::DescriptorType::eCombinedImageSampler, 1 };
+	vk::DescriptorPoolCreateInfo pool_info = { {} ,max_sets, sizes.size(), sizes.data() };
 	try {
 		m_descriptor_pool = m_device.createDescriptorPool(pool_info);
 	}
@@ -345,8 +360,11 @@ void renderer::destroy_descriptor_pool()
 
 void renderer::create_descriptor_set_layout()
 {
-	vk::DescriptorSetLayoutBinding binding = { 0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, {} };
-    vk::DescriptorSetLayoutCreateInfo ci = { {}, 1, &binding };
+	std::array<vk::DescriptorSetLayoutBinding, 2> bindings;
+	bindings[0] = { 0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, {} };	//ubo
+	bindings[1] = { 1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, {} };	//sampler
+
+    vk::DescriptorSetLayoutCreateInfo ci = { {}, bindings.size(), bindings.data() };
     vk::DescriptorSetLayout layout;
     try {
 		m_descriptor_layout = m_device.createDescriptorSetLayout(ci);
@@ -377,9 +395,13 @@ void renderer::create_descriptor_set()
 
 	//configure
 	vk::DescriptorBufferInfo buf_info = { m_uniform_buffer.get(), 0, m_uniform_buffer_size };
-	vk::WriteDescriptorSet write_info = { m_descriptor_set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, {}, &buf_info, {} };
+	vk::DescriptorImageInfo img_info = { m_tex_sampler, m_tex_view, vk::ImageLayout::eShaderReadOnlyOptimal };
+	std::array<vk::WriteDescriptorSet, 2> write_info;
+
+	write_info[0] = { m_descriptor_set, 0, 0, 1, vk::DescriptorType::eUniformBuffer, {}, &buf_info, {} };
+	write_info[1] = { m_descriptor_set, 1, 0, 1, vk::DescriptorType::eCombinedImageSampler, &img_info, {}, {} };
 	try {
-		m_device.updateDescriptorSets( { write_info }, {});
+		m_device.updateDescriptorSets(write_info, {});
 	}
 	catch(const std::exception& e) {
 		throw std::runtime_error("failed to update descriptor set.");
@@ -398,12 +420,219 @@ void renderer::update_uniform_buffer()
 		std::array<float, 16> view;
 		std::array<float, 16> proj;
 	};
+	//static float angle = 0.0f;
+	//angle += maths::to_radians(0.025f);
 	maths::vec4<float> vec { 0.25, 0.0, 0.0, 1.0 };
 	m_transform_mat.translate(vec);
+	//m_transform_mat.rotate(maths::axis::z, angle);
 
 	ubo this_obj_ubo = { m_transform_mat.column_major_data(), m_view_mat.column_major_data(), m_projection_mat.column_major_data() };
-	std::cout << "writing data" << std::endl;
 	m_uniform_buffer.write(&this_obj_ubo, m_uniform_buffer_size);
+}
+
+
+//Images
+
+void renderer::create_texture(std::string path)
+{
+	int32_t width, height, nchannels;
+	unsigned char *img = stbi_load(path.c_str(), &width, &height, &nchannels, STBI_rgb_alpha);
+	vk::DeviceSize size = width * height * 4;
+	log << "image size is: " << size;
+	if(!img) {
+		throw std::runtime_error("failed to stbi_load()");
+	}
+
+	create_image(&m_tex, &m_tex_mem, width, height, vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
+	m_staging_buffer.reset(m_device, m_physical_device, img, size);
+	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+	m_staging_buffer.copy(m_tex, m_transfer_pool, m_graphics_queue, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+	create_image_view(&m_tex, &m_tex_view, vk::Format::eR8G8B8A8Unorm);
+	create_sampler();
+
+	stbi_image_free(img);
+}
+
+void renderer::destroy_texture()
+{
+	destroy_sampler();
+	destroy_image_view(&m_tex_view);
+	destroy_image(&m_tex, &m_tex_mem);
+}
+
+void renderer::create_image(vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags)
+{
+	
+	//create image
+	vk::ImageCreateInfo ci = {
+		{},
+		vk::ImageType::e2D,
+		format,
+		{ static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 },
+		1,
+		1,
+		vk::SampleCountFlagBits::e1,
+		tiling,
+		usage,
+		vk::SharingMode::eExclusive,
+		{},
+		{},
+		vk::ImageLayout::eUndefined
+	};
+
+	//allocate memory
+	try {
+		*img = m_device.createImage(ci);
+	}
+	catch(const std::exception& e) {
+		throw std::runtime_error("failed to create vk::Image");
+	}
+
+	vk::MemoryRequirements mem_req = m_device.getImageMemoryRequirements(*img);
+	vk::PhysicalDeviceMemoryProperties p_props = m_physical_device.getMemoryProperties();
+
+	uint32_t mem_i = std::numeric_limits<uint32_t>::max();
+	
+	for(uint32_t i = 0; i < p_props.memoryTypeCount; i++) {
+		if(mem_req.memoryTypeBits & (1 << i) && p_props.memoryTypes[i].propertyFlags & (mem_flags)) {
+			mem_i = i;
+			break;
+		}
+	}
+	
+	if(mem_i == std::numeric_limits<uint32_t>::max()) {
+		throw std::runtime_error("failed to find suitable device memory.");
+	}
+
+	vk::MemoryAllocateInfo ai = { mem_req.size, mem_i };
+
+	try {
+		*mem = m_device.allocateMemory(ai);
+	}
+	catch(const std::exception& e) {
+		throw std::runtime_error("failed to allocate memory");
+	}
+
+	m_device.bindImageMemory(*img, *mem, 0);
+
+	log << "created + allocated image";
+}
+
+void renderer::destroy_image(vk::Image *img, vk::DeviceMemory *img_mem)
+{
+	m_device.freeMemory(*img_mem);
+	m_device.destroyImage(*img);
+}
+
+void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout)
+{
+	log << "begin transition";
+	vk::CommandBuffer cmd_buffer = create_command_buffer(vk::CommandBufferLevel::ePrimary);
+	vk::CommandBufferBeginInfo bi = { vk::CommandBufferUsageFlagBits::eOneTimeSubmit, {} };
+	cmd_buffer.begin(bi);
+	/* commands here */
+	vk::AccessFlags src_access_flags;
+	vk::AccessFlags dst_access_flags;
+	vk::PipelineStageFlags src_flags;
+	vk::PipelineStageFlags dst_flags;
+
+	//determine the access rules
+	if(old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eTransferDstOptimal) {
+		src_access_flags = vk::AccessFlags();
+		dst_access_flags = vk::AccessFlagBits::eTransferWrite;
+		src_flags = vk::PipelineStageFlagBits::eTopOfPipe;
+		dst_flags = vk::PipelineStageFlagBits::eTransfer;
+	}
+	else if(old_layout == vk::ImageLayout::eTransferDstOptimal && new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+		src_access_flags = vk::AccessFlagBits::eTransferWrite;
+		dst_access_flags = vk::AccessFlagBits::eShaderRead;
+		src_flags = vk::PipelineStageFlagBits::eTransfer;
+		dst_flags = vk::PipelineStageFlagBits::eFragmentShader;
+	}
+	else {
+		throw std::runtime_error("invalid access rules for transisitoning image layout!");
+	}
+	
+	vk::ImageMemoryBarrier barrier = {
+		src_access_flags,
+		dst_access_flags,
+		old_layout,
+		new_layout,
+		{},
+		{},
+		img,
+		{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+	};
+	cmd_buffer.pipelineBarrier(
+		src_flags,
+		dst_flags,
+		vk::DependencyFlagBits::eByRegion,
+		{},
+		{},
+		{ barrier }
+	);
+	/* end commands */
+	cmd_buffer.end();
+	vk::Fence end_fence = m_device.createFence({});
+	vk::SubmitInfo si = { {}, {}, {}, 1, &cmd_buffer, {}, {} };
+	m_graphics_queue.submit({ si}, end_fence);
+
+	m_device.waitForFences({ end_fence }, true, std::numeric_limits<uint64_t>::max());
+	m_device.freeCommandBuffers(m_command_pool, {cmd_buffer});
+	m_device.destroyFence(end_fence);
+	log << "end transition.";
+}
+
+void renderer::create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format)
+{
+	vk::ComponentMapping components = { vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity , vk::ComponentSwizzle::eIdentity , vk::ComponentSwizzle::eIdentity };
+	vk::ImageSubresourceRange subrange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+	vk::ImageViewCreateInfo ci = { {}, *img, vk::ImageViewType::e2D, format, components, subrange };
+	try {
+		*iv = m_device.createImageView(ci);
+	}
+	catch(const std::exception& e) {
+		throw std::runtime_error("failed to create image view.");
+	}
+}
+
+void renderer::destroy_image_view(vk::ImageView *iv)
+{
+	m_device.destroyImageView(*iv);
+}
+
+void renderer::create_sampler()
+{
+	vk::SamplerCreateInfo ci = {
+		{},
+		vk::Filter::eLinear,
+		vk::Filter::eLinear,
+		vk::SamplerMipmapMode::eLinear,
+		vk::SamplerAddressMode::eRepeat,
+		vk::SamplerAddressMode::eRepeat,
+		vk::SamplerAddressMode::eRepeat,
+		0.0f,
+		m_sampler_anistropy,
+		16.0f,
+		false,
+		vk::CompareOp::eAlways,
+		0.0f,
+		0.0f,
+		vk::BorderColor::eIntOpaqueBlack,
+		false
+	};
+	try {
+		m_tex_sampler = m_device.createSampler(ci);
+	}
+	catch(const std::exception& e) {
+		throw std::runtime_error("failed to create sampler.");
+	}
+}
+
+void renderer::destroy_sampler()
+{
+	m_device.destroySampler(m_tex_sampler);
 }
 
 //Command buffers
@@ -503,6 +732,7 @@ void renderer::destroy_drawing_enviroment()
 
 void renderer::draw()
 {
+	update_uniform_buffer();
 	//do logic here
 	m_graphics_queue.waitIdle();
 	m_fps_counter.tick(std::chrono::steady_clock::now());

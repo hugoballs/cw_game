@@ -6,6 +6,7 @@
 #include "window.h"
 #include <memory>
 #include <chrono>
+#include <string>
 
 
 #include "renderer.inl"
@@ -69,6 +70,12 @@ private:
 	cwg::maths::mat4<float> m_view_mat;
 	cwg::maths::mat4<float> m_projection_mat;
 
+	vk::Image m_tex;
+	vk::DeviceMemory m_tex_mem;
+	vk::ImageView m_tex_view;
+	vk::Sampler m_tex_sampler;
+	bool m_sampler_anistropy;
+
 	vk::Semaphore m_render_should_begin;										//semaphores used for synchronisation in the draw() function
 	vk::Semaphore m_render_has_finished;
 
@@ -90,13 +97,23 @@ private:
 	void destroy_command_buffer(vk::CommandBuffer buffer);
 	void record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuffer framebuffer, vk::Pipeline pipeline, graphics::vertex_buffer& vb);
 
-	void create_descriptor_pool(vk::DescriptorType type, uint32_t descriptor_count, uint32_t max_sets = 1);
+	void create_descriptor_pool(uint32_t max_sets = 1);
 	void destroy_descriptor_pool();
 	void create_descriptor_set_layout();
 	void destroy_descriptor_set_layout();
 	void create_descriptor_set();
 	void destroy_descriptor_set();
 	void update_uniform_buffer();
+
+	void create_texture(std::string path);
+	void destroy_texture();
+	void create_image( vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags);
+	void destroy_image(vk::Image *img, vk::DeviceMemory *img_mem);
+	void transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout);
+	void create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format);
+	void destroy_image_view(vk::ImageView *iv);
+	void create_sampler();
+	void destroy_sampler();
 
 	void create_drawing_enviroment(graphics::vertex_buffer& vb);
 	void destroy_drawing_enviroment();
