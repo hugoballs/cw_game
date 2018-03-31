@@ -11,8 +11,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(WIN32)
     set(LINK_LIBS vulkan-1.lib glfw3.lib)
     set(PP_DEF "VK_USE_PLATFORM_WIN32_KHR" "NOMINMAX")
-    include_directories("C:\\glfw-3.2.1.bin.WIN64\\include" "C:\\VulkanSDK\\1.0.68.0\\Include")
-    link_directories("C:\\glfw-3.2.1.bin.WIN64\\lib-vc2015" "C:\\VulkanSDK\\1.0.68.0\\Lib")           #using mingw
+    include_directories("C:\\glfw-3.2.1.bin.WIN64\\include" "C:\\VulkanSDK\\1.0.70.1\\Include")
+    link_directories("C:\\glfw-3.2.1.bin.WIN64\\lib-vc2015" "C:\\VulkanSDK\\1.1.70.1\\Lib")
 elseif(UNIX)
     set(LINK_LIBS libvulkan.so libglfw3.a -ldl -pthread -lm
     -ldl

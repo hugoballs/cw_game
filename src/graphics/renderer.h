@@ -22,8 +22,6 @@
 
 #include "misc/fps_counter.h"
 
-#include "../maths/mat.h"
-
 namespace cwg {
 namespace graphics {
 
@@ -66,9 +64,6 @@ private:
 	vk::DeviceSize m_uniform_buffer_size = 3 * 16 * sizeof(float);
 	vk::DescriptorSet m_descriptor_set;
 	vk::DescriptorSetLayout m_descriptor_layout;
-	cwg::maths::mat4<float> m_transform_mat;
-	cwg::maths::mat4<float> m_view_mat;
-	cwg::maths::mat4<float> m_projection_mat;
 
 	vk::Image m_tex;
 	vk::DeviceMemory m_tex_mem;

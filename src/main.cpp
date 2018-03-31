@@ -3,9 +3,6 @@
 #include "graphics/renderer.h"
 #include "logic/logic.h"
 
-#include "maths/vec.h"
-#include "maths/mat.h"
-
 #include <iostream>
 #include <chrono>
 

@@ -8,10 +8,18 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "../dependencies/stb_image.h"
 
+//glm
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/fwd.hpp>
+#include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 namespace cwg {
 namespace graphics {
 
-renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(1.0f), m_view_mat(1.0f), m_projection_mat(1.0f)
+renderer::renderer() : log("renderer", "log/renderer.log", {})
 {
 	/* Right now there is no initialisation. will definetly need vulkan support detection*/
 	m_internal_state = renderer_states::init;
@@ -26,26 +34,33 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 	//caution: vulkan uses inverted y axis
 	//NOTE: IMPORTANT: make sure the vertices are in the correct order
 	std::vector<float> data = {
-		-0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
-		0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
-		0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
-		-0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0
+		-0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+		0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,
+		0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+		-0.5, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+
+		-0.5, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
+		0.5, 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+		0.5, -0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
+		-0.5, -0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 1.0
 	};
 	auto t_size = data.size() * sizeof(float);
-	auto v_size = (2 + 3 + 2) * sizeof(float);
+	auto v_size = (3 + 3 + 2) * sizeof(float);
 
 	m_staging_buffer.reset(m_device, m_physical_device, data, t_size, v_size);
 	m_primary_vb.reset(m_device, m_physical_device, t_size, v_size);
 	m_staging_buffer.copy(m_primary_vb, m_transfer_pool, m_graphics_queue);
 	m_staging_buffer.reset();
 
-	m_primary_vb.set_attribute(0, 0, 2);
+	m_primary_vb.set_attribute(0, 0, 3);
 	m_primary_vb.set_attribute(0, 1, 3);
 	m_primary_vb.set_attribute(0, 2, 2);
 
 	std::vector<uint32_t> indices = {
 		0, 1, 2,
-		2, 3, 0
+		2, 3, 0,
+		4, 5, 6,
+		6, 7, 4
 	};
 
 	m_staging_buffer.reset(m_device, m_physical_device, indices, indices.size() * sizeof(uint32_t));
@@ -55,7 +70,7 @@ renderer::renderer() : log("renderer", "log/renderer.log", {}), m_transform_mat(
 
 	m_uniform_buffer.reset(m_device, m_physical_device, m_uniform_buffer_size);
 	
-	create_texture("resources/earth.jpg");
+	create_texture("resources/brick.png");
 
 	create_descriptor_pool(1);
 	create_descriptor_set_layout();
@@ -416,17 +431,16 @@ void renderer::destroy_descriptor_set()
 void renderer::update_uniform_buffer()
 {
 	struct ubo {
-		std::array<float, 16> model;
-		std::array<float, 16> view;
-		std::array<float, 16> proj;
+		glm::mat4 model;
+		glm::mat4 view;
+		glm::mat4 proj;
 	};
-	//static float angle = 0.0f;
-	//angle += maths::to_radians(0.025f);
-	maths::vec4<float> vec { 0.25, 0.0, 0.0, 1.0 };
-	m_transform_mat.translate(vec);
-	//m_transform_mat.rotate(maths::axis::z, angle);
+	ubo this_obj_ubo;
+	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	this_obj_ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	vk::Extent2D e = m_window.get_image_extent();
+	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), static_cast<float>(e.width / e.height), 0.1f, 100.0f);
 
-	ubo this_obj_ubo = { m_transform_mat.column_major_data(), m_view_mat.column_major_data(), m_projection_mat.column_major_data() };
 	m_uniform_buffer.write(&this_obj_ubo, m_uniform_buffer_size);
 }
 
@@ -732,7 +746,7 @@ void renderer::destroy_drawing_enviroment()
 
 void renderer::draw()
 {
-	update_uniform_buffer();
+	//update_uniform_buffer();
 	//do logic here
 	m_graphics_queue.waitIdle();
 	m_fps_counter.tick(std::chrono::steady_clock::now());
