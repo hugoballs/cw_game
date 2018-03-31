@@ -1,6 +1,7 @@
 #include <cstring>
 #include <fstream>
 #include <array>
+#include <chrono>
 
 #include "renderer.h"
 #include "buffers/uniform_buffer.h"
@@ -34,15 +35,15 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	//caution: vulkan uses inverted y axis
 	//NOTE: IMPORTANT: make sure the vertices are in the correct order
 	std::vector<float> data = {
-		-0.5, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-		0.5, 0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,
-		0.5, -0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
-		-0.5, -0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+		-0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+		0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,
+		0.5, 0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
+		-0.5, 0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
 
-		-0.5, 0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
-		0.5, 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
-		0.5, -0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
-		-0.5, -0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 1.0
+		-0.5, -0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
+		0.5, -0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+		0.5, 0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
+		-0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 1.0
 	};
 	auto t_size = data.size() * sizeof(float);
 	auto v_size = (3 + 3 + 2) * sizeof(float);
@@ -355,7 +356,7 @@ void renderer::create_descriptor_pool(uint32_t max_sets)
 	std::array<vk::DescriptorPoolSize, 2> sizes;
 	sizes[0] = { vk::DescriptorType::eUniformBuffer, 1 };
 	sizes[1] = { vk::DescriptorType::eCombinedImageSampler, 1 };
-	vk::DescriptorPoolCreateInfo pool_info = { {} ,max_sets, sizes.size(), sizes.data() };
+	vk::DescriptorPoolCreateInfo pool_info = { {} ,max_sets, static_cast<uint32_t>(sizes.size()), sizes.data() };
 	try {
 		m_descriptor_pool = m_device.createDescriptorPool(pool_info);
 	}
@@ -379,7 +380,7 @@ void renderer::create_descriptor_set_layout()
 	bindings[0] = { 0, vk::DescriptorType::eUniformBuffer, 1, vk::ShaderStageFlagBits::eVertex, {} };	//ubo
 	bindings[1] = { 1, vk::DescriptorType::eCombinedImageSampler, 1, vk::ShaderStageFlagBits::eFragment, {} };	//sampler
 
-    vk::DescriptorSetLayoutCreateInfo ci = { {}, bindings.size(), bindings.data() };
+    vk::DescriptorSetLayoutCreateInfo ci = { {}, static_cast<uint32_t>(bindings.size()), bindings.data() };
     vk::DescriptorSetLayout layout;
     try {
 		m_descriptor_layout = m_device.createDescriptorSetLayout(ci);
@@ -435,11 +436,21 @@ void renderer::update_uniform_buffer()
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
+
+	static auto t1 = std::chrono::steady_clock::now();
+	auto t2 = std::chrono::steady_clock::now();
+	float delta = std::chrono::duration<float, std::chrono::seconds::period>(t2 - t1).count();
+
 	ubo this_obj_ubo;
-	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	this_obj_ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	//this_obj_ubo.model = glm::rotate(this_obj_ubo.model, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	this_obj_ubo.view = glm::lookAt(glm::vec3(0.225f, 1.25f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	vk::Extent2D e = m_window.get_image_extent();
-	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), static_cast<float>(e.width / e.height), 0.1f, 100.0f);
+	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), static_cast<float>(e.width / e.height), 0.1f, 10.0f);
+
+	//NOTE: this is required for vulkan's inverted coordinate system
+	//it's also probably part of why my own projection matrix didn't work.
+	this_obj_ubo.proj[1][1] *= -1;
 
 	m_uniform_buffer.write(&this_obj_ubo, m_uniform_buffer_size);
 }
