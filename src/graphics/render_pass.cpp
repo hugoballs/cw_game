@@ -1,11 +1,13 @@
 #include "render_pass.h"
 
+#include <array>
+
 namespace cwg {
 namespace graphics {
 
-render_pass::render_pass(vk::Device dev, vk::Format format) : m_device(dev)
+render_pass::render_pass(vk::Device dev, vk::Format colour_format, vk::Format depth_format) : m_device(dev)
 {
-    create(format);
+    create(colour_format, depth_format);
 }
 
 render_pass::~render_pass()
@@ -13,23 +15,36 @@ render_pass::~render_pass()
     destroy();
 }
 
-void render_pass::create(vk::Format format)
+void render_pass::create(vk::Format colour_format, vk::Format depth_format)
 {
     if(m_device == vk::Device()) { throw std::runtime_error("cannot create rendere pass if there is no device."); }
     //attachments
-	vk::AttachmentDescription attach_desc = {
+	std::array<vk::AttachmentDescription, 2> attach_desc_arr;
+	attach_desc_arr[0] = {
 		{},
-		format,
+		colour_format,
 		vk::SampleCountFlagBits::e1,
-		vk::AttachmentLoadOp::eClear,
-		vk::AttachmentStoreOp::eStore,
-		vk::AttachmentLoadOp::eDontCare,
-		vk::AttachmentStoreOp::eDontCare,
+		vk::AttachmentLoadOp::eClear,						//load op
+		vk::AttachmentStoreOp::eStore,						//store op
+		vk::AttachmentLoadOp::eDontCare,					//stencil load op
+		vk::AttachmentStoreOp::eDontCare,					//stencil store op
 		vk::ImageLayout::eUndefined,
 		vk::ImageLayout::ePresentSrcKHR
 	};
-	
-	vk::AttachmentReference attach_ref = { 0, vk::ImageLayout::eColorAttachmentOptimal };		// 0 defines the output location in the fragment shader
+	attach_desc_arr[1] = {
+		{},
+		depth_format,
+		vk::SampleCountFlagBits::e1,
+		vk::AttachmentLoadOp::eClear,
+		vk::AttachmentStoreOp::eDontCare,
+		vk::AttachmentLoadOp::eDontCare,
+		vk::AttachmentStoreOp::eDontCare,
+		vk::ImageLayout::eUndefined,
+		vk::ImageLayout::eDepthStencilAttachmentOptimal
+	};
+
+	vk::AttachmentReference colour_attach_ref = { 0, vk::ImageLayout::eColorAttachmentOptimal };		// 0 defines the output location in the fragment shader
+	vk::AttachmentReference depth_attach_ref = { 1, vk::ImageLayout::eDepthStencilAttachmentOptimal };
 
 	//subpass
 	vk::SubpassDescription subpass_desc = {
@@ -38,9 +53,9 @@ void render_pass::create(vk::Format format)
 		{},																						//input attachment count
 		{},																						//input attachment reference
 		1,																						//color attachment count
-		&attach_ref,																			//color attachment references
+		&colour_attach_ref,																		//color attachment references
 		{},																						//resolve attachment
-		{},																						//depth stencil attachment
+		&depth_attach_ref,																		//depth stencil attachment
 		{},																						//preserve attachment count
 		{}																						//preserve attachments
 	};
@@ -59,8 +74,8 @@ void render_pass::create(vk::Format format)
 	//create
 	vk::RenderPassCreateInfo create_info = {
 		{},
-		1,
-		&attach_desc,
+		static_cast<uint32_t>(attach_desc_arr.size()),
+		attach_desc_arr.data(),
 		1,
 		&subpass_desc,
 		1,

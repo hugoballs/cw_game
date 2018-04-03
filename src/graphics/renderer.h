@@ -71,6 +71,11 @@ private:
 	vk::Sampler m_tex_sampler;
 	bool m_sampler_anistropy;
 
+	vk::Image m_depth_image;
+	vk::DeviceMemory m_depth_mem;
+	vk::ImageView m_depth_view;
+	vk::Format m_depth_format;
+
 	vk::Semaphore m_render_should_begin;										//semaphores used for synchronisation in the draw() function
 	vk::Semaphore m_render_has_finished;
 
@@ -105,10 +110,14 @@ private:
 	void create_image( vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags);
 	void destroy_image(vk::Image *img, vk::DeviceMemory *img_mem);
 	void transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout);
-	void create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format);
+	void create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format, vk::ImageAspectFlagBits asp_flags);
 	void destroy_image_view(vk::ImageView *iv);
 	void create_sampler();
 	void destroy_sampler();
+
+	void create_depth_buffer();
+	void destroy_depth_buffer();
+	vk::Format select_image_format(std::vector<vk::Format>&& formats, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 
 	void create_drawing_enviroment(graphics::vertex_buffer& vb);
 	void destroy_drawing_enviroment();

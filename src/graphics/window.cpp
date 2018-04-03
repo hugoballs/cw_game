@@ -2,6 +2,7 @@
 #include "../logger.h"
 
 #include <assert.h>
+#include <array>
 
 namespace cwg {
 
@@ -236,7 +237,7 @@ void window::create_image_views()
 	log << "create image views" ;
 }
 
-	void window::create_framebuffers(vk::RenderPass render_pass)
+	void window::create_framebuffers(vk::RenderPass render_pass, vk::ImageView depth_view)
 	{
 		vk::Extent2D extent = m_image_extent;
 		auto& image_views = m_swapchain_image_views;
@@ -244,8 +245,8 @@ void window::create_image_views()
 		m_framebuffers.resize(count);
 
 		for (int i = 0; i < count; i++) {
-			vk::ImageView attachments[] = {image_views[i]};
-			vk::FramebufferCreateInfo info = {{}, render_pass, 1, attachments, extent.width, extent.height, 1};
+			std::array<vk::ImageView, 2> attachments = { image_views[i], depth_view };
+			vk::FramebufferCreateInfo info = {{}, render_pass, static_cast<uint32_t>(attachments.size()), attachments.data(), extent.width, extent.height, 1};
 			try {
 				m_framebuffers[i] = m_device.createFramebuffer(info);
 			}

@@ -53,7 +53,7 @@ void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D ex
 		false,																			//rasteriser discard
 		vk::PolygonMode::eFill,
 		vk::CullModeFlagBits::eBack,
-		vk::FrontFace::eClockwise,
+		vk::FrontFace::eCounterClockwise,
 		false,																			//depth bias
 		0.0f,
 		0.0f,
@@ -76,6 +76,20 @@ void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D ex
 	vk::DynamicState dynamic_states_array[] = { vk::DynamicState::eViewport, vk::DynamicState::eLineWidth };			
 	vk::PipelineDynamicStateCreateInfo dynamic_state = { {}, 2, dynamic_states_array };
 
+	//depth stencil
+	vk::PipelineDepthStencilStateCreateInfo depth_stencil_state = {
+		{},
+		true,
+		true,
+		vk::CompareOp::eLess,
+		false,
+		false,
+		{},
+		{},
+		0.0f,
+		1.0f
+	};
+
 	//create
 	vk::Pipeline pipeline;
 	vk::GraphicsPipelineCreateInfo create_info = {
@@ -88,7 +102,7 @@ void pipeline::create(vk::RenderPass rp, vk::PipelineLayout lay, vk::Extent2D ex
 		&viewport_state,
 		&rasterisation_state,
 		&multisample_state,
-		{},																	// depth stencil
+		&depth_stencil_state,												// depth stencil
 		&colour_blend_state,
 		{},																	//TODO: implement dynamic state
 		lay,

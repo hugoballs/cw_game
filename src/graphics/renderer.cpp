@@ -14,7 +14,6 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/fwd.hpp>
 #include <glm/glm.hpp>
-#include <glm/mat4x4.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace cwg {
@@ -34,16 +33,17 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	create_transfer_pool();
 	//caution: vulkan uses inverted y axis
 	//NOTE: IMPORTANT: make sure the vertices are in the correct order
+	//note: depth-buffering is required for the difference to become perceivable.
 	std::vector<float> data = {
 		-0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
 		0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,
 		0.5, 0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
 		-0.5, 0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
 
-		-0.5, -0.5, 0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
-		0.5, -0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
-		0.5, 0.5, 0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
-		-0.5, 0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 1.0
+		-0.5, -0.5, -0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
+		0.5, -0.5, -0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+		0.5, 0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
+		-0.5, 0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0
 	};
 	auto t_size = data.size() * sizeof(float);
 	auto v_size = (3 + 3 + 2) * sizeof(float);
@@ -53,9 +53,9 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	m_staging_buffer.copy(m_primary_vb, m_transfer_pool, m_graphics_queue);
 	m_staging_buffer.reset();
 
-	m_primary_vb.set_attribute(0, 0, 3);
-	m_primary_vb.set_attribute(0, 1, 3);
-	m_primary_vb.set_attribute(0, 2, 2);
+	m_primary_vb.set_attribute(0, 0, 3);	//position
+	m_primary_vb.set_attribute(0, 1, 3);	//colour
+	m_primary_vb.set_attribute(0, 2, 2);	//texture coords
 
 	std::vector<uint32_t> indices = {
 		0, 1, 2,
@@ -71,7 +71,7 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 
 	m_uniform_buffer.reset(m_device, m_physical_device, m_uniform_buffer_size);
 	
-	create_texture("resources/brick.png");
+	create_texture("resources/sculpture.jpg");
 
 	create_descriptor_pool(1);
 	create_descriptor_set_layout();
@@ -442,11 +442,13 @@ void renderer::update_uniform_buffer()
 	float delta = std::chrono::duration<float, std::chrono::seconds::period>(t2 - t1).count();
 
 	ubo this_obj_ubo;
-	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	//this_obj_ubo.model = glm::mat4(1.0f);
 	//this_obj_ubo.model = glm::rotate(this_obj_ubo.model, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-	this_obj_ubo.view = glm::lookAt(glm::vec3(0.225f, 1.25f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	//NOTE: IMPORTANT! the up vector is defined as the z-axis
+	this_obj_ubo.view = glm::lookAt(glm::vec3(-0.25f, 1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	vk::Extent2D e = m_window.get_image_extent();
-	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), static_cast<float>(e.width / e.height), 0.1f, 10.0f);
+	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), float(e.width) / float(e.height), 0.1f, 10.0f);
 
 	//NOTE: this is required for vulkan's inverted coordinate system
 	//it's also probably part of why my own projection matrix didn't work.
@@ -473,7 +475,7 @@ void renderer::create_texture(std::string path)
 	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 	m_staging_buffer.copy(m_tex, m_transfer_pool, m_graphics_queue, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-	create_image_view(&m_tex, &m_tex_view, vk::Format::eR8G8B8A8Unorm);
+	create_image_view(&m_tex, &m_tex_view, vk::Format::eR8G8B8A8Unorm, vk::ImageAspectFlagBits::eColor);
 	create_sampler();
 
 	stbi_image_free(img);
@@ -561,6 +563,7 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 	vk::AccessFlags dst_access_flags;
 	vk::PipelineStageFlags src_flags;
 	vk::PipelineStageFlags dst_flags;
+	vk::ImageAspectFlags asp_flags;
 
 	//determine the access rules
 	if(old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eTransferDstOptimal) {
@@ -575,8 +578,26 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 		src_flags = vk::PipelineStageFlagBits::eTransfer;
 		dst_flags = vk::PipelineStageFlagBits::eFragmentShader;
 	}
+	else if(old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+		src_access_flags = vk::AccessFlags();
+		dst_access_flags = vk::AccessFlagBits::eDepthStencilAttachmentRead | vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+		src_flags = vk::PipelineStageFlagBits::eTopOfPipe;
+		dst_flags = vk::PipelineStageFlagBits::eEarlyFragmentTests;
+	}
 	else {
 		throw std::runtime_error("invalid access rules for transisitoning image layout!");
+	}
+
+	//determine the aspect flags
+	if(new_layout == vk::ImageLayout::eDepthStencilAttachmentOptimal) {
+		asp_flags = vk::ImageAspectFlagBits::eDepth;
+
+		if(format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint) {
+			asp_flags |= vk::ImageAspectFlagBits::eStencil;
+		}
+	}
+	else {
+		asp_flags = vk::ImageAspectFlagBits::eColor;
 	}
 	
 	vk::ImageMemoryBarrier barrier = {
@@ -587,7 +608,7 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 		{},
 		{},
 		img,
-		{vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
+		{ asp_flags , 0, 1, 0, 1 }
 	};
 	cmd_buffer.pipelineBarrier(
 		src_flags,
@@ -609,10 +630,10 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 	log << "end transition.";
 }
 
-void renderer::create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format)
+void renderer::create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format, vk::ImageAspectFlagBits asp_flags)
 {
 	vk::ComponentMapping components = { vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity , vk::ComponentSwizzle::eIdentity , vk::ComponentSwizzle::eIdentity };
-	vk::ImageSubresourceRange subrange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 };
+	vk::ImageSubresourceRange subrange = { asp_flags , 0, 1, 0, 1 };
 	vk::ImageViewCreateInfo ci = { {}, *img, vk::ImageViewType::e2D, format, components, subrange };
 	try {
 		*iv = m_device.createImageView(ci);
@@ -660,6 +681,49 @@ void renderer::destroy_sampler()
 	m_device.destroySampler(m_tex_sampler);
 }
 
+//depth buffer
+
+void renderer::create_depth_buffer()
+{
+	m_depth_format = select_image_format(
+		{ vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint},
+		vk::ImageTiling::eOptimal,
+		vk::FormatFeatureFlagBits::eDepthStencilAttachment
+	);
+	vk::Extent2D e = m_window.get_image_extent();
+	create_image(&m_depth_image, &m_depth_mem, e.width, e.height, m_depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
+	create_image_view(&m_depth_image, &m_depth_view, m_depth_format, vk::ImageAspectFlagBits::eDepth);
+	transition_image_layout(m_depth_image, m_depth_format, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+}
+
+void renderer::destroy_depth_buffer() {
+	destroy_image_view(&m_depth_view);
+	destroy_image(&m_depth_image, &m_depth_mem);
+}
+
+vk::Format renderer::select_image_format(std::vector<vk::Format>&& formats, vk::ImageTiling tiling, vk::FormatFeatureFlags features)
+{
+	if(tiling == vk::ImageTiling::eLinear) {
+		for(const auto& format : formats) {
+			vk::FormatProperties props = m_physical_device.getFormatProperties(format);
+			if(props.linearTilingFeatures & features) {
+				return format;
+			}
+		}
+		//error
+		throw std::runtime_error("could not find linear tiling format with requested features.");
+	}
+	else if(tiling == vk::ImageTiling::eOptimal) {
+		for(const auto& format : formats) {
+			vk::FormatProperties props = m_physical_device.getFormatProperties(format);
+			if(props.optimalTilingFeatures & features) {
+				return format;
+			}
+		}
+		throw std::runtime_error("could not find optimal tiling format with requested features.");
+	}
+}
+
 //Command buffers
 
 vk::CommandBuffer renderer::create_command_buffer(vk::CommandBufferLevel level)
@@ -692,8 +756,11 @@ void renderer::record_command_buffer(vk::CommandBuffer cmd_buffer, vk::Framebuff
 	}
 
 	vk::Rect2D area = { {0, 0}, m_window.get_image_extent() };
-	vk::ClearValue clear = vk::ClearColorValue(std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f });
-	vk::RenderPassBeginInfo rp_info = { m_primary_render_pass.get(), framebuffer, area, 1, &clear };
+	std::array<vk::ClearValue, 2> clear =  {
+		vk::ClearColorValue(std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 1.0f }),
+		vk::ClearDepthStencilValue(1.0f, 0)
+	};
+	vk::RenderPassBeginInfo rp_info = { m_primary_render_pass.get(), framebuffer, area, static_cast<uint32_t>(clear.size()), clear.data() };
 	try {
 		cmd_buffer.beginRenderPass(rp_info, vk::SubpassContents::eInline);								//TODO: modify for secondary command buffers
 	}
@@ -824,18 +891,20 @@ void renderer::recreate_swapchain()
 void renderer::create_pipeline()
 {
     log << "creating pipeline...";
-    m_primary_render_pass.reset(m_device, m_window.get_image_format());
+	create_depth_buffer();
+    m_primary_render_pass.reset(m_device, m_window.get_image_format(), m_depth_format);
 	//m_descriptor_layouts.clear();
 	//m_descriptor_layouts.push_back(m_descriptor_set.get_layout());
     m_primary_layout.reset(m_device, &m_descriptor_layout);
     m_primary_pipeline.reset(m_device, m_primary_render_pass.get(), m_primary_layout.get(), m_window.get_image_extent(), &m_primary_vb);
-    m_window.create_framebuffers(m_primary_render_pass.get());
+    m_window.create_framebuffers(m_primary_render_pass.get(), m_depth_view);
 }
 
 void renderer::clear_pipeline()
 {
     m_device.waitIdle();
     log << "clearing pipeline...";
+	destroy_depth_buffer();
     m_window.destroy_framebuffers();
     m_primary_render_pass.reset();
     m_primary_layout.reset();

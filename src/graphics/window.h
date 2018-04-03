@@ -68,7 +68,7 @@ public:
 	void create_image_views();
 	//void destroy_image_views();
 
-	void create_framebuffers(vk::RenderPass render_pass);
+	void create_framebuffers(vk::RenderPass render_pass, vk::ImageView depth_view);
 	void destroy_framebuffers();
 
     bool has_resized();

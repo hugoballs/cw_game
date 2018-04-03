@@ -7,7 +7,8 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
-layout(location = 0) in vec2 inPos;
+//NOTE: when adding a z coordinate, don't forget to change vec2 to vec3!
+layout(location = 0) in vec3 inPos;
 layout(location = 1) in vec3 inCol;
 layout(location = 2) in vec2 inTexCoord;
 
@@ -19,10 +20,12 @@ out gl_PerVertex {
 };
 
 void main() {
-	//NOTE: inverting the -y axis is a possible solution to Vulkan's new coordinate system. In fact it is preferable because matrices do not need to be changed.
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPos.x, -inPos.y, 0.0, 1.0);
+	//NOTE: inverting the -y axis is a possible solution to Vulkan's new coordinate system.
+    //another is modifying the projection matrix
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPos.x, inPos.y, inPos.z, 1.0);
    	//gl_Position = vec4(inPos.x, inPos.y, 0.0, 1.0);
    	vec4 temp = ubo.proj * ubo.view * ubo.model * vec4(inCol, 1.0);
     fragCol = vec3(temp.x, temp.y, temp.z);
+    //NOTE: don't forget to change the texture coordinates too
     fragTexCoord = inTexCoord;
 }
