@@ -2,12 +2,16 @@
 #include <fstream>
 #include <array>
 #include <chrono>
+#include <string>
 
 #include "renderer.h"
 #include "buffers/uniform_buffer.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "../dependencies/stb_image.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../dependencies/tiny_obj_loader.h"
 
 //glm
 #define GLM_FORCE_RADIANS
@@ -21,6 +25,9 @@ namespace graphics {
 
 renderer::renderer() : log("renderer", "log/renderer.log", {})
 {
+	const std::string model_path = "resources/chalet.obj";
+	const std::string tex_path = "resources/chalet.jpg";
+
 	/* Right now there is no initialisation. will definetly need vulkan support detection*/
 	m_internal_state = renderer_states::init;
 
@@ -34,21 +41,15 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	//caution: vulkan uses inverted y axis
 	//NOTE: IMPORTANT: make sure the vertices are in the correct order
 	//note: depth-buffering is required for the difference to become perceivable.
-	std::vector<float> data = {
-		-0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
-		0.5, -0.5, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0,
-		0.5, 0.5, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0,
-		-0.5, 0.5, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+	std::vector<float> vertices_data;
+	std::vector<uint32_t> indices_data;
 
-		-0.5, -0.5, -0.5, 1.0, 0.0, 0.0, 0.0, 0.0,
-		0.5, -0.5, -0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
-		0.5, 0.5, -0.5, 0.0, 0.0, 1.0, 1.0, 1.0,
-		-0.5, 0.5, -0.5, 1.0, 1.0, 1.0, 0.0, 1.0
-	};
-	auto t_size = data.size() * sizeof(float);
+	load_model(&vertices_data, &indices_data, model_path);
+
+	auto t_size = vertices_data.size() * sizeof(float);
 	auto v_size = (3 + 3 + 2) * sizeof(float);
 
-	m_staging_buffer.reset(m_device, m_physical_device, data, t_size, v_size);
+	m_staging_buffer.reset(m_device, m_physical_device, vertices_data, t_size, v_size);
 	m_primary_vb.reset(m_device, m_physical_device, t_size, v_size);
 	m_staging_buffer.copy(m_primary_vb, m_transfer_pool, m_graphics_queue);
 	m_staging_buffer.reset();
@@ -57,21 +58,14 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	m_primary_vb.set_attribute(0, 1, 3);	//colour
 	m_primary_vb.set_attribute(0, 2, 2);	//texture coords
 
-	std::vector<uint32_t> indices = {
-		0, 1, 2,
-		2, 3, 0,
-		4, 5, 6,
-		6, 7, 4
-	};
-
-	m_staging_buffer.reset(m_device, m_physical_device, indices, indices.size() * sizeof(uint32_t));
-	m_primary_ib.reset(m_device, m_physical_device, indices.size() * sizeof(uint32_t));
+	m_staging_buffer.reset(m_device, m_physical_device, indices_data, indices_data.size() * sizeof(uint32_t));
+	m_primary_ib.reset(m_device, m_physical_device, indices_data.size() * sizeof(uint32_t));
 	m_staging_buffer.copy(m_primary_ib, m_transfer_pool, m_graphics_queue);
 	m_staging_buffer.reset();
 
 	m_uniform_buffer.reset(m_device, m_physical_device, m_uniform_buffer_size);
 	
-	create_texture("resources/sculpture.jpg");
+	create_texture(tex_path.c_str());
 
 	create_descriptor_pool(1);
 	create_descriptor_set_layout();
@@ -442,11 +436,11 @@ void renderer::update_uniform_buffer()
 	float delta = std::chrono::duration<float, std::chrono::seconds::period>(t2 - t1).count();
 
 	ubo this_obj_ubo;
-	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	this_obj_ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	//this_obj_ubo.model = glm::mat4(1.0f);
 	//this_obj_ubo.model = glm::rotate(this_obj_ubo.model, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	//NOTE: IMPORTANT! the up vector is defined as the z-axis
-	this_obj_ubo.view = glm::lookAt(glm::vec3(-0.25f, 1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	this_obj_ubo.view = glm::lookAt(glm::vec3(0.75f, 2.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	vk::Extent2D e = m_window.get_image_extent();
 	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), float(e.width) / float(e.height), 0.1f, 10.0f);
 
@@ -722,6 +716,45 @@ vk::Format renderer::select_image_format(std::vector<vk::Format>&& formats, vk::
 		}
 		throw std::runtime_error("could not find optimal tiling format with requested features.");
 	}
+}
+
+//model loading
+
+void renderer::load_model(std::vector<float> *vertices, std::vector<uint32_t> *indices, const std::string path)
+{
+	log << "loading model...";
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string errstr;
+
+	if(!tinyobj::LoadObj(&attrib, &shapes, &materials, &errstr, path.c_str())) {
+		throw std::runtime_error(errstr);
+	}
+	else {
+		log << "importing vertices...";
+	}
+
+	uint32_t i_count = 0;
+	for(const auto& s : shapes) {
+		for(const auto& i : s.mesh.indices){
+			
+			vertices->push_back(attrib.vertices[3 * i.vertex_index + 0]);		//x
+			vertices->push_back(attrib.vertices[3 * i.vertex_index + 1]);		//y
+			vertices->push_back(attrib.vertices[3 * i.vertex_index + 2]);		//z
+
+			vertices->push_back(1.0f);				//colours
+			vertices->push_back(1.0f);
+			vertices->push_back(1.0f);
+
+			vertices->push_back(attrib.texcoords[2 * i.texcoord_index + 0]);		//tex x
+			vertices->push_back(1.0 - attrib.texcoords[2 * i.texcoord_index + 1]);		//tex y. dont't forget to invert the y-axis
+
+			indices->push_back(i_count);
+			i_count++;
+		}
+	}
+	log << "model loaded";
 }
 
 //Command buffers

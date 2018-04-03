@@ -119,6 +119,8 @@ private:
 	void destroy_depth_buffer();
 	vk::Format select_image_format(std::vector<vk::Format>&& formats, vk::ImageTiling tiling, vk::FormatFeatureFlags features);
 
+	void load_model(std::vector<float> *vertices, std::vector<uint32_t> *indices, const std::string path);
+
 	void create_drawing_enviroment(graphics::vertex_buffer& vb);
 	void destroy_drawing_enviroment();
 
