@@ -4,6 +4,9 @@
 #include <chrono>
 #include <string>
 
+#include <cmath>
+#include <algorithm>
+
 #include "renderer.h"
 #include "buffers/uniform_buffer.h"
 
@@ -40,7 +43,7 @@ renderer::renderer() : log("renderer", "log/renderer.log", {})
 	create_transfer_pool();
 	//caution: vulkan uses inverted y axis
 	//NOTE: IMPORTANT: make sure the vertices are in the correct order
-	//note: depth-buffering is required for the difference to become perceivable.
+	//NOTE: this does not take advantage of the index buffer
 	std::vector<float> vertices_data;
 	std::vector<uint32_t> indices_data;
 
@@ -440,7 +443,7 @@ void renderer::update_uniform_buffer()
 	//this_obj_ubo.model = glm::mat4(1.0f);
 	//this_obj_ubo.model = glm::rotate(this_obj_ubo.model, glm::radians(45.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	//NOTE: IMPORTANT! the up vector is defined as the z-axis
-	this_obj_ubo.view = glm::lookAt(glm::vec3(0.75f, 2.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	this_obj_ubo.view = glm::lookAt(glm::vec3(0.0f, 1.25f, 0.5f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	vk::Extent2D e = m_window.get_image_extent();
 	this_obj_ubo.proj = glm::perspective(glm::radians(90.0f), float(e.width) / float(e.height), 0.1f, 10.0f);
 
@@ -464,13 +467,16 @@ void renderer::create_texture(std::string path)
 		throw std::runtime_error("failed to stbi_load()");
 	}
 
-	create_image(&m_tex, &m_tex_mem, width, height, vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
+	m_tex_mip_levels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+	create_image(&m_tex, &m_tex_mem, width, height, m_tex_mip_levels, vk::Format::eR8G8B8A8Unorm, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal);
 	m_staging_buffer.reset(m_device, m_physical_device, img, size);
-	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
+	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, m_tex_mip_levels);
 	m_staging_buffer.copy(m_tex, m_transfer_pool, m_graphics_queue, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-	transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
-	create_image_view(&m_tex, &m_tex_view, vk::Format::eR8G8B8A8Unorm, vk::ImageAspectFlagBits::eColor);
-	create_sampler();
+	generate_mipmaps(m_tex, width, height, m_tex_mip_levels);
+	//transition_image_layout(m_tex, vk::Format::eR8G8B8A8Unorm, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
+	create_image_view(&m_tex, &m_tex_view, vk::Format::eR8G8B8A8Unorm, vk::ImageAspectFlagBits::eColor, m_tex_mip_levels);
+	create_sampler(static_cast<float>(m_tex_mip_levels));
 
 	stbi_image_free(img);
 }
@@ -482,7 +488,7 @@ void renderer::destroy_texture()
 	destroy_image(&m_tex, &m_tex_mem);
 }
 
-void renderer::create_image(vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags)
+void renderer::create_image(vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, uint32_t mip_level,vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags)
 {
 	
 	//create image
@@ -491,7 +497,7 @@ void renderer::create_image(vk::Image *img, vk::DeviceMemory *mem, int32_t width
 		vk::ImageType::e2D,
 		format,
 		{ static_cast<uint32_t>(width), static_cast<uint32_t>(height), 1 },
-		1,
+		mip_level,
 		1,
 		vk::SampleCountFlagBits::e1,
 		tiling,
@@ -546,7 +552,7 @@ void renderer::destroy_image(vk::Image *img, vk::DeviceMemory *img_mem)
 	m_device.destroyImage(*img);
 }
 
-void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout)
+void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t mip_levels)
 {
 	log << "begin transition";
 	vk::CommandBuffer cmd_buffer = create_command_buffer(vk::CommandBufferLevel::ePrimary);
@@ -593,7 +599,7 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 	else {
 		asp_flags = vk::ImageAspectFlagBits::eColor;
 	}
-	
+
 	vk::ImageMemoryBarrier barrier = {
 		src_access_flags,
 		dst_access_flags,
@@ -602,7 +608,7 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 		{},
 		{},
 		img,
-		{ asp_flags , 0, 1, 0, 1 }
+		{ asp_flags , 0, mip_levels, 0, 1 }
 	};
 	cmd_buffer.pipelineBarrier(
 		src_flags,
@@ -624,10 +630,10 @@ void renderer::transition_image_layout(vk::Image& img, vk::Format format, vk::Im
 	log << "end transition.";
 }
 
-void renderer::create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format, vk::ImageAspectFlagBits asp_flags)
+void renderer::create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format, vk::ImageAspectFlagBits asp_flags, uint32_t mip_level)
 {
 	vk::ComponentMapping components = { vk::ComponentSwizzle::eIdentity, vk::ComponentSwizzle::eIdentity , vk::ComponentSwizzle::eIdentity , vk::ComponentSwizzle::eIdentity };
-	vk::ImageSubresourceRange subrange = { asp_flags , 0, 1, 0, 1 };
+	vk::ImageSubresourceRange subrange = { asp_flags, 0, mip_level, 0, 1 };
 	vk::ImageViewCreateInfo ci = { {}, *img, vk::ImageViewType::e2D, format, components, subrange };
 	try {
 		*iv = m_device.createImageView(ci);
@@ -642,7 +648,7 @@ void renderer::destroy_image_view(vk::ImageView *iv)
 	m_device.destroyImageView(*iv);
 }
 
-void renderer::create_sampler()
+void renderer::create_sampler(float mip_levels)
 {
 	vk::SamplerCreateInfo ci = {
 		{},
@@ -658,7 +664,7 @@ void renderer::create_sampler()
 		false,
 		vk::CompareOp::eAlways,
 		0.0f,
-		0.0f,
+		mip_levels,
 		vk::BorderColor::eIntOpaqueBlack,
 		false
 	};
@@ -675,6 +681,63 @@ void renderer::destroy_sampler()
 	m_device.destroySampler(m_tex_sampler);
 }
 
+void renderer::generate_mipmaps(vk::Image img, int32_t width, int32_t height, uint32_t mip_levels)
+{
+	vk::CommandBuffer cmd_buffer = create_command_buffer(vk::CommandBufferLevel::ePrimary);
+	vk::CommandBufferBeginInfo bi = { vk::CommandBufferUsageFlagBits::eOneTimeSubmit, {} };
+	cmd_buffer.begin(bi);
+	/* begin cmd buffer */
+	vk::ImageMemoryBarrier barrier = { {}, {}, {}, {}, {}, {}, img, { vk::ImageAspectFlagBits::eColor, {}, 1, 0, 1} };
+
+	int32_t curr_width = width;
+	int32_t curr_height = height;
+
+	for(uint32_t i = 1; i < mip_levels; i++) {
+		barrier.subresourceRange.setBaseMipLevel(i - 1);
+		barrier.setOldLayout(vk::ImageLayout::eTransferDstOptimal);
+		barrier.setNewLayout(vk::ImageLayout::eTransferSrcOptimal);
+		barrier.setSrcAccessMask(vk::AccessFlagBits::eTransferWrite);
+		barrier.setDstAccessMask(vk::AccessFlagBits::eTransferRead);
+
+		cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer,vk::DependencyFlagBits::eByRegion, {}, {}, { barrier });
+
+		vk::ImageSubresourceLayers src_layers = { vk::ImageAspectFlagBits::eColor, i - 1, 0, 1 };
+		vk::ImageSubresourceLayers dst_layers = { vk::ImageAspectFlagBits::eColor, i, 0, 1 };
+		//double braces required for array init. see: https://stackoverflow.com/questions/14178264/c11-correct-stdarray-initialization 
+		vk::ImageBlit blit = { src_layers, {{ {}, { curr_width, curr_height, 1 } }}, dst_layers, {{ {}, { curr_width / 2, curr_height / 2, 1 } }} };
+
+		cmd_buffer.blitImage(img, vk::ImageLayout::eTransferSrcOptimal, img, vk::ImageLayout::eTransferDstOptimal, { blit }, vk::Filter::eLinear );
+
+		barrier.setOldLayout(vk::ImageLayout::eTransferSrcOptimal);
+		barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+		barrier.setSrcAccessMask(vk::AccessFlagBits::eTransferRead);
+		barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+
+		cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, vk::DependencyFlagBits::eByRegion, {}, {}, { barrier });
+
+		if(curr_width > 1) { curr_width /= 2; }
+		if(curr_height > 1) { curr_height /= 2; }
+	}
+
+	barrier.subresourceRange.setBaseMipLevel(mip_levels - 1);
+	barrier.setOldLayout(vk::ImageLayout::eTransferDstOptimal);
+	barrier.setNewLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+	barrier.setSrcAccessMask(vk::AccessFlagBits::eTransferWrite);
+	barrier.setDstAccessMask(vk::AccessFlagBits::eShaderRead);
+
+	cmd_buffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eFragmentShader, vk::DependencyFlagBits::eByRegion, {}, {}, { barrier } );
+
+	/* end cmd buffer */
+	cmd_buffer.end();
+	vk::Fence end_fence = m_device.createFence({});
+	vk::SubmitInfo si = { {}, {}, {}, 1, &cmd_buffer, {}, {} };
+	m_graphics_queue.submit({ si}, end_fence);
+
+	m_device.waitForFences({ end_fence }, true, std::numeric_limits<uint64_t>::max());
+	m_device.freeCommandBuffers(m_command_pool, {cmd_buffer});
+	m_device.destroyFence(end_fence);
+}
+
 //depth buffer
 
 void renderer::create_depth_buffer()
@@ -685,9 +748,9 @@ void renderer::create_depth_buffer()
 		vk::FormatFeatureFlagBits::eDepthStencilAttachment
 	);
 	vk::Extent2D e = m_window.get_image_extent();
-	create_image(&m_depth_image, &m_depth_mem, e.width, e.height, m_depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
-	create_image_view(&m_depth_image, &m_depth_view, m_depth_format, vk::ImageAspectFlagBits::eDepth);
-	transition_image_layout(m_depth_image, m_depth_format, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal);
+	create_image(&m_depth_image, &m_depth_mem, e.width, e.height, 1, m_depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
+	create_image_view(&m_depth_image, &m_depth_view, m_depth_format, vk::ImageAspectFlagBits::eDepth, 1);
+	transition_image_layout(m_depth_image, m_depth_format, vk::ImageLayout::eUndefined, vk::ImageLayout::eDepthStencilAttachmentOptimal, 1);
 }
 
 void renderer::destroy_depth_buffer() {

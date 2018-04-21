@@ -70,6 +70,7 @@ private:
 	vk::ImageView m_tex_view;
 	vk::Sampler m_tex_sampler;
 	bool m_sampler_anistropy;
+	uint32_t m_tex_mip_levels;
 
 	vk::Image m_depth_image;
 	vk::DeviceMemory m_depth_mem;
@@ -107,13 +108,14 @@ private:
 
 	void create_texture(std::string path);
 	void destroy_texture();
-	void create_image( vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags);
+	void create_image( vk::Image *img, vk::DeviceMemory *mem, int32_t width, int32_t height, uint32_t mip_level, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlagBits mem_flags);
 	void destroy_image(vk::Image *img, vk::DeviceMemory *img_mem);
-	void transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout);
-	void create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format, vk::ImageAspectFlagBits asp_flags);
+	void transition_image_layout(vk::Image& img, vk::Format format, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t mip_levels);
+	void create_image_view(vk::Image *img, vk::ImageView *iv, vk::Format format, vk::ImageAspectFlagBits asp_flags, uint32_t mip_level);
 	void destroy_image_view(vk::ImageView *iv);
-	void create_sampler();
+	void create_sampler(float mip_levels);
 	void destroy_sampler();
+	void generate_mipmaps(vk::Image img, int32_t width, int32_t height, uint32_t mip_levels);
 
 	void create_depth_buffer();
 	void destroy_depth_buffer();
