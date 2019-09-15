@@ -28,7 +28,7 @@ elseif(UNIX)
 endif(WIN32)
 
 #headers
-include_directories(./src ./src./graphics/ ./src/graphics/buffers ./src/graphics/misc ./src/graphics/objects ./src//logic ./src/maths)
+include_directories(./src ./src./graphics/ ./src/graphics/buffers ./src/graphics/misc ./src/logic)
 
 #source
 file(GLOB_RECURSE SOURCES ./src/*.cpp)
